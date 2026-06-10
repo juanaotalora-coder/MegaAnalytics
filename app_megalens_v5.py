@@ -52,7 +52,7 @@ def check_password():
 </svg>
                 </div>
                 <h1 style='color:white;font-size:32px;font-weight:800;margin:0;letter-spacing:2px'>
-                    <span style='color:#3ABFC4'>M</span><span style='color:white'>ega</span><span style='color:#6DB33F'>l</span><span style='color:white'>e</span><span style='color:#3ABFC4'>n</span><span style='color:#6DB33F'>s</span>
+                    <span style='color:#3ABFC4'>Mega</span><span style='background:linear-gradient(90deg,#6DB33F,#3ABFC4);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text'> Analytics</span>
                 </h1>
             </div>
         </div>
@@ -82,7 +82,7 @@ st.markdown("""
     <div style='position:absolute;bottom:-40px;left:35%;width:160px;height:160px;
         background:radial-gradient(circle,rgba(109,179,63,0.12) 0%,transparent 70%);border-radius:50%'></div>
     <div style='position:relative;z-index:1;text-align:center'>
-        <div style='width:64px;height:64px;margin:0 auto 14px;
+        <div style='width:64px;height:64px;margin:0 auto 8px;
             filter:drop-shadow(0 4px 16px rgba(58,191,196,0.5))'>
             <svg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'>
   <defs>
@@ -96,8 +96,8 @@ st.markdown("""
   <text x='30' y='36' text-anchor='middle' font-family='Arial Black,Arial' font-weight='900' font-size='22' fill='white' letter-spacing='1'>M</text>
 </svg>
         </div>
-        <h1 style='color:white;margin:0;font-size:40px;font-weight:800;letter-spacing:2px;line-height:1'>
-            <span style='color:#3ABFC4'>M</span><span style='color:white'>ega</span><span style='color:#6DB33F'>l</span><span style='color:white'>e</span><span style='color:#3ABFC4'>n</span><span style='color:#6DB33F'>s</span>
+        <h1 style='color:rgba(255,255,255,0.55);margin:0;font-size:40px;font-weight:800;letter-spacing:2px;line-height:1'>
+            Megalens
         </h1>
         <p style='color:rgba(255,255,255,0.55);margin:8px 0 0;font-size:12px;
             letter-spacing:3px;text-transform:uppercase'>
