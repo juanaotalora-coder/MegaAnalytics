@@ -10,11 +10,10 @@ st.set_page_config(page_title="Análisis Megalens", layout="wide")
 # ── Autenticación simple ──────────────────────────────────────
 import hmac
 
-CONTRASENA = "megalens2026"  # Cambia esta contraseña aquí
-
 def check_password():
     def password_entered():
-        if hmac.compare_digest(st.session_state["password"], CONTRASENA):
+        contrasena = st.secrets.get("APP_PASSWORD", "") if hasattr(st, "secrets") else ""
+        if contrasena and hmac.compare_digest(st.session_state["password"], contrasena):
             st.session_state["authenticated"] = True
             del st.session_state["password"]
         else:
