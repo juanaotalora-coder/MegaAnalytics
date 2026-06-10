@@ -45,13 +45,56 @@ if not check_password():
     st.stop()
 
 st.markdown("""
-<div style='background:linear-gradient(135deg,#1A1A1A 0%,#2D2D2D 100%);
-            padding:20px 30px;border-radius:10px;margin-bottom:20px;
-            border-left:5px solid #3ABFC4;'>
-    <h1 style='color:white;margin:0;font-size:26px;font-weight:700;letter-spacing:1px'>
-        <span style='color:#3ABFC4'>mega</span><span style='color:white'>l</span><span style='color:#6DB33F'>e</span><span style='color:white'>ns</span>
-        <span style='color:#aaa;font-size:16px;font-weight:400;margin-left:12px'>· Análisis de Clientes y Ventas</span>
-    </h1>
+<div style='
+    background: linear-gradient(135deg, #0D2E35 0%, #1A5C6B 40%, #1E7A3E 100%);
+    padding: 36px 40px;
+    border-radius: 16px;
+    margin-bottom: 24px;
+    box-shadow: 0 8px 32px rgba(58,191,196,0.25);
+    position: relative;
+    overflow: hidden;
+'>
+    <div style='
+        position: absolute; top: -40px; right: -40px;
+        width: 200px; height: 200px;
+        background: radial-gradient(circle, rgba(58,191,196,0.15) 0%, transparent 70%);
+        border-radius: 50%;
+    '></div>
+    <div style='
+        position: absolute; bottom: -30px; left: 30%;
+        width: 150px; height: 150px;
+        background: radial-gradient(circle, rgba(109,179,63,0.12) 0%, transparent 70%);
+        border-radius: 50%;
+    '></div>
+    <div style='position:relative;z-index:1'>
+        <div style='display:flex;align-items:center;gap:16px;margin-bottom:8px'>
+            <div style='
+                width:52px;height:52px;
+                background:linear-gradient(135deg,#3ABFC4,#6DB33F);
+                border-radius:50%;
+                display:flex;align-items:center;justify-content:center;
+                font-size:22px;font-weight:900;color:white;
+                box-shadow:0 4px 12px rgba(58,191,196,0.4);
+            '>M</div>
+            <div>
+                <h1 style='
+                    color:white;margin:0;
+                    font-size:36px;font-weight:800;
+                    letter-spacing:2px;line-height:1;
+                '>
+                    <span style='color:#3ABFC4'>Mega</span><span style='color:white'> </span><span style='
+                        background:linear-gradient(90deg,#6DB33F,#3ABFC4);
+                        -webkit-background-clip:text;
+                        -webkit-text-fill-color:transparent;
+                        background-clip:text;
+                    '>Analytics</span>
+                </h1>
+                <p style='color:rgba(255,255,255,0.6);margin:4px 0 0;font-size:13px;letter-spacing:3px;text-transform:uppercase'>
+                    Laboratorios Oftálmicos · Análisis de Clientes y Ventas
+                </p>
+            </div>
+        </div>
+    </div>
 </div>
 """, unsafe_allow_html=True)
 
