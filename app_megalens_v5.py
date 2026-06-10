@@ -23,12 +23,43 @@ def check_password():
         return True
 
     st.markdown("""
-    <div style='max-width:400px;margin:80px auto;text-align:center'>
-        <div style='background:linear-gradient(135deg,#1A1A1A,#2D2D2D);padding:30px;border-radius:12px;border-left:5px solid #3ABFC4'>
-            <h1 style='color:white;font-size:28px;margin:0'>
-                <span style='color:#3ABFC4'>mega</span><span style='color:white'>l</span><span style='color:#6DB33F'>e</span><span style='color:white'>ns</span>
-            </h1>
-            <p style='color:#aaa;margin:8px 0 0;font-size:14px'>Laboratorios Oftálmicos</p>
+    <div style='max-width:440px;margin:60px auto;text-align:center'>
+        <div style='
+            background:linear-gradient(135deg,#0D2E35 0%,#1A5C6B 40%,#1E7A3E 100%);
+            padding:40px 36px;border-radius:16px;
+            box-shadow:0 8px 32px rgba(58,191,196,0.25);
+            position:relative;overflow:hidden;
+        '>
+            <div style='
+                position:absolute;top:-40px;right:-40px;
+                width:180px;height:180px;
+                background:radial-gradient(circle,rgba(58,191,196,0.15) 0%,transparent 70%);
+                border-radius:50%;
+            '></div>
+            <div style='position:relative;z-index:1'>
+                <div style='width:64px;height:64px;margin:0 auto 16px;
+                    filter:drop-shadow(0 4px 12px rgba(58,191,196,0.5))'>
+                    <svg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'>
+  <defs>
+    <linearGradient id='lg2' x1='0%25' y1='0%25' x2='100%25' y2='100%25'>
+      <stop offset='0%25' style='stop-color:%233ABFC4'/>
+      <stop offset='100%25' style='stop-color:%236DB33F'/>
+    </linearGradient>
+  </defs>
+  <path d='M30 4 C44 4 56 14 56 28 C56 44 44 57 30 57 C16 57 4 44 4 28 C4 14 16 4 30 4 Z' fill='url(%23lg2)'/>
+  <path d='M30 54 Q30 35 30 8' stroke='rgba(255,255,255,0.25)' stroke-width='1.2' fill='none'/>
+  <text x='30' y='36' text-anchor='middle' font-family='Arial Black,Arial' font-weight='900' font-size='22' fill='white' letter-spacing='1'>M</text>
+</svg>
+                </div>
+                <h1 style='color:white;font-size:32px;font-weight:800;margin:0;letter-spacing:2px'>
+                    <span style='color:#3ABFC4'>Mega</span>
+                    <span style='
+                        background:linear-gradient(90deg,#6DB33F,#3ABFC4);
+                        -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+                        background-clip:text;
+                    '> Analytics</span>
+                </h1>
+            </div>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -46,54 +77,40 @@ if not check_password():
 
 st.markdown("""
 <div style='
-    background: linear-gradient(135deg, #0D2E35 0%, #1A5C6B 40%, #1E7A3E 100%);
-    padding: 36px 40px;
-    border-radius: 16px;
-    margin-bottom: 24px;
-    box-shadow: 0 8px 32px rgba(58,191,196,0.25);
-    position: relative;
-    overflow: hidden;
+    background:linear-gradient(135deg,#0D2E35 0%,#1A5C6B 40%,#1E7A3E 100%);
+    padding:28px 36px;border-radius:16px;margin-bottom:24px;
+    box-shadow:0 8px 32px rgba(58,191,196,0.25);
+    position:relative;overflow:hidden;
 '>
-    <div style='
-        position: absolute; top: -40px; right: -40px;
-        width: 200px; height: 200px;
-        background: radial-gradient(circle, rgba(58,191,196,0.15) 0%, transparent 70%);
-        border-radius: 50%;
-    '></div>
-    <div style='
-        position: absolute; bottom: -30px; left: 30%;
-        width: 150px; height: 150px;
-        background: radial-gradient(circle, rgba(109,179,63,0.12) 0%, transparent 70%);
-        border-radius: 50%;
-    '></div>
-    <div style='position:relative;z-index:1'>
-        <div style='display:flex;align-items:center;gap:16px;margin-bottom:8px'>
-            <div style='
-                width:52px;height:52px;
-                background:linear-gradient(135deg,#3ABFC4,#6DB33F);
-                border-radius:50%;
-                display:flex;align-items:center;justify-content:center;
-                font-size:22px;font-weight:900;color:white;
-                box-shadow:0 4px 12px rgba(58,191,196,0.4);
-            '>M</div>
-            <div>
-                <h1 style='
-                    color:white;margin:0;
-                    font-size:36px;font-weight:800;
-                    letter-spacing:2px;line-height:1;
-                '>
-                    <span style='color:#3ABFC4'>Mega</span><span style='color:white'> </span><span style='
-                        background:linear-gradient(90deg,#6DB33F,#3ABFC4);
-                        -webkit-background-clip:text;
-                        -webkit-text-fill-color:transparent;
-                        background-clip:text;
-                    '>Analytics</span>
-                </h1>
-                <p style='color:rgba(255,255,255,0.6);margin:4px 0 0;font-size:13px;letter-spacing:3px;text-transform:uppercase'>
-                    Laboratorios Oftálmicos · Análisis de Clientes y Ventas
-                </p>
-            </div>
+    <div style='position:absolute;top:-50px;right:-50px;width:220px;height:220px;
+        background:radial-gradient(circle,rgba(58,191,196,0.15) 0%,transparent 70%);border-radius:50%'></div>
+    <div style='position:absolute;bottom:-40px;left:35%;width:160px;height:160px;
+        background:radial-gradient(circle,rgba(109,179,63,0.12) 0%,transparent 70%);border-radius:50%'></div>
+    <div style='position:relative;z-index:1;text-align:center'>
+        <div style='width:64px;height:64px;margin:0 auto 14px;
+            filter:drop-shadow(0 4px 16px rgba(58,191,196,0.5))'>
+            <svg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'>
+  <defs>
+    <linearGradient id='lg2' x1='0%25' y1='0%25' x2='100%25' y2='100%25'>
+      <stop offset='0%25' style='stop-color:%233ABFC4'/>
+      <stop offset='100%25' style='stop-color:%236DB33F'/>
+    </linearGradient>
+  </defs>
+  <path d='M30 4 C44 4 56 14 56 28 C56 44 44 57 30 57 C16 57 4 44 4 28 C4 14 16 4 30 4 Z' fill='url(%23lg2)'/>
+  <path d='M30 54 Q30 35 30 8' stroke='rgba(255,255,255,0.25)' stroke-width='1.2' fill='none'/>
+  <text x='30' y='36' text-anchor='middle' font-family='Arial Black,Arial' font-weight='900' font-size='22' fill='white' letter-spacing='1'>M</text>
+</svg>
         </div>
+        <h1 style='color:white;margin:0;font-size:40px;font-weight:800;letter-spacing:2px;line-height:1'>
+            <span style='color:#3ABFC4'>Mega</span>
+            <span style='background:linear-gradient(90deg,#6DB33F,#3ABFC4);
+                -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+                background-clip:text'> Analytics</span>
+        </h1>
+        <p style='color:rgba(255,255,255,0.55);margin:8px 0 0;font-size:12px;
+            letter-spacing:3px;text-transform:uppercase'>
+            Laboratorios Oftálmicos &nbsp;·&nbsp; Análisis de Clientes y Ventas
+        </p>
     </div>
 </div>
 """, unsafe_allow_html=True)
