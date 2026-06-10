@@ -310,19 +310,16 @@ if archivo:
             with v[-1]:
                 st.markdown(f"<div style='text-align:center;font-size:20px;font-weight:700;color:#3D3D3D;padding:6px 0'>{n_3m}</div>", unsafe_allow_html=True)
 
-            tooltip_txt = "Proporción de clientes que compraron en los 3 meses seleccionados, en relación con el promedio mensual de clientes activos del período."
             st.markdown(f"""
             <div style='background:linear-gradient(90deg,#3ABFC4,#6DB33F);color:white;
                         text-align:center;padding:10px;border-radius:6px;
-                        font-weight:600;font-size:14px;margin-top:6px;
-                        display:flex;align-items:center;justify-content:center;gap:8px'>
-                <span>Porcentaje de Fidelización: {pct_3m:.0f}%</span>
-                <span title="{tooltip_txt}" style='cursor:help;background:rgba(255,255,255,0.3);
-                      border-radius:50%;width:18px;height:18px;display:inline-flex;
-                      align-items:center;justify-content:center;font-size:11px;font-weight:700'>ℹ</span>
+                        font-weight:600;font-size:14px;margin-top:6px'>
+                Porcentaje de Fidelización: {pct_3m:.0f}%
             </div>
             </div>
             """, unsafe_allow_html=True)
+            with st.popover("ℹ️ ¿Qué es el Porcentaje de Fidelización?"):
+                st.markdown("Proporción de clientes que compraron en los **3 meses seleccionados**, en relación con el promedio mensual de clientes activos del período.")
             st.markdown("<div style='margin-bottom:8px'></div>", unsafe_allow_html=True)
 
         # Variación YoY promedio compras + Últ. 3M
@@ -461,9 +458,18 @@ if archivo:
         st.subheader("Período de análisis")
         todos_pares_global = [(f"{m} {a}", m, c, a) for a in anios for m, c in data_por_anio[a]]
         opciones_periodo = [p[0] for p in todos_pares_global] + ["YTD"]
+        # Mes actual como predeterminado
+        from datetime import date
+        mes_actual_label = MESES_ORDEN[date.today().month - 1]
+        anio_actual = date.today().year
+        default_label = f"{mes_actual_label} {anio_actual}"
+        if default_label in opciones_periodo:
+            idx_default_periodo = opciones_periodo.index(default_label)
+        else:
+            idx_default_periodo = len(opciones_periodo) - 1
         periodo_sel = st.selectbox("Selecciona el período a analizar en las pestañas (no aplica en Análisis por cliente)",
                                     opciones_periodo,
-                                    index=len(opciones_periodo)-1,
+                                    index=idx_default_periodo,
                                     key="periodo_global")
 
         # Calcular columnas y valores según selección
