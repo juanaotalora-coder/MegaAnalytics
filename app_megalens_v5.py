@@ -52,12 +52,7 @@ def check_password():
 </svg>
                 </div>
                 <h1 style='color:white;font-size:32px;font-weight:800;margin:0;letter-spacing:2px'>
-                    <span style='color:#3ABFC4'>Mega</span>
-                    <span style='
-                        background:linear-gradient(90deg,#6DB33F,#3ABFC4);
-                        -webkit-background-clip:text;-webkit-text-fill-color:transparent;
-                        background-clip:text;
-                    '> Analytics</span>
+                    <span style='color:#3ABFC4'>M</span><span style='color:white'>ega</span><span style='color:#6DB33F'>l</span><span style='color:white'>e</span><span style='color:#3ABFC4'>n</span><span style='color:#6DB33F'>s</span>
                 </h1>
             </div>
         </div>
@@ -102,10 +97,7 @@ st.markdown("""
 </svg>
         </div>
         <h1 style='color:white;margin:0;font-size:40px;font-weight:800;letter-spacing:2px;line-height:1'>
-            <span style='color:#3ABFC4'>Mega</span>
-            <span style='background:linear-gradient(90deg,#6DB33F,#3ABFC4);
-                -webkit-background-clip:text;-webkit-text-fill-color:transparent;
-                background-clip:text'> Analytics</span>
+            <span style='color:#3ABFC4'>M</span><span style='color:white'>ega</span><span style='color:#6DB33F'>l</span><span style='color:white'>e</span><span style='color:#3ABFC4'>n</span><span style='color:#6DB33F'>s</span>
         </h1>
         <p style='color:rgba(255,255,255,0.55);margin:8px 0 0;font-size:12px;
             letter-spacing:3px;text-transform:uppercase'>
