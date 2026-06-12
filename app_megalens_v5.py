@@ -752,62 +752,46 @@ if archivo:
                     if not meses_disp:
                         continue
 
-                    st.markdown(f"""
-                    <div style='background:linear-gradient(135deg,#EAF7F7 0%,#F0F7EA 100%);
-                                border:1px solid #3ABFC4;border-radius:10px;
-                                padding:12px 8px;margin-bottom:12px;
-                                box-shadow:0 2px 6px rgba(58,191,196,0.1)'>
-                    """, unsafe_allow_html=True)
-
-                    cols_tabla = st.columns(len(meses_disp) + 2)
-                    with cols_tabla[0]:
-                        st.markdown("<div style='font-size:13px;color:#3D3D3D;padding:4px 0'></div>", unsafe_allow_html=True)
-                    for j, m in enumerate(meses_disp):
-                        with cols_tabla[j+1]:
-                            st.markdown(f"<div style='font-size:13px;font-weight:700;text-align:center;padding:4px 0;color:#3ABFC4'>{m}</div>", unsafe_allow_html=True)
-                    with cols_tabla[-1]:
-                        st.markdown("<div style='font-size:13px;font-weight:700;text-align:center;padding:4px 0;color:#6DB33F'>YTD</div>", unsafe_allow_html=True)
-
-                    # Fila cliente
-                    cols_v = st.columns(len(meses_disp) + 2)
-                    with cols_v[0]:
-                        st.markdown("<div style='font-size:13px;color:#3D3D3D;font-weight:600;padding:4px 0'>Cliente</div>", unsafe_allow_html=True)
-                    for j, m in enumerate(meses_disp):
-                        val = fila.get(m, 0)
-                        color_v = "#3ABFC4" if val >= umbral else "#999"
-                        with cols_v[j+1]:
-                            st.markdown(f"<div style='text-align:center;font-size:15px;font-weight:600;color:{color_v};padding:3px 0'>${val:,.0f}</div>", unsafe_allow_html=True)
-                    with cols_v[-1]:
-                        st.markdown(f"<div style='text-align:center;font-size:15px;font-weight:700;color:#6DB33F;padding:3px 0'>${fila.get('YTD',0):,.0f}</div>", unsafe_allow_html=True)
-
-                    # Fila promedio
-                    cols_p = st.columns(len(meses_disp) + 2)
-                    with cols_p[0]:
-                        st.markdown("<div style='font-size:13px;color:#3D3D3D;padding:4px 0'>Prom. compradores</div>", unsafe_allow_html=True)
-                    for j, m in enumerate(meses_disp):
-                        val = fila.get(f"Prom {m}", 0)
-                        with cols_p[j+1]:
-                            st.markdown(f"<div style='text-align:center;font-size:14px;color:#666;padding:3px 0'>${val:,.0f}</div>", unsafe_allow_html=True)
-                    with cols_p[-1]:
-                        st.markdown(f"<div style='text-align:center;font-size:14px;color:#666;padding:3px 0'>${fila.get('YTD Promedio',0):,.0f}</div>", unsafe_allow_html=True)
-
-                    # Fila diferencia
-                    cols_d = st.columns(len(meses_disp) + 2)
-                    with cols_d[0]:
-                        st.markdown("<div style='font-size:13px;color:#3D3D3D;padding:4px 0;border-top:1px solid #3ABFC4;margin-top:4px'>Dif. vs prom.</div>", unsafe_allow_html=True)
-                    for j, m in enumerate(meses_disp):
-                        cli_v = fila.get(m, 0)
+                    # Construir dataframe para mostrar con formato limpio
+                    filas_tabla = {"": ["Cliente", "Prom. compradores", "Dif. vs prom."]}
+                    for m in meses_disp:
+                        cli_v  = fila.get(m, 0)
                         prom_v = fila.get(f"Prom {m}", 0)
-                        dif = cli_v - prom_v
-                        col_d = "#27AE60" if dif >= 0 else "#E74C3C"
-                        with cols_d[j+1]:
-                            st.markdown(f"<div style='text-align:center;font-size:13px;font-weight:600;color:{col_d};padding:3px 0;border-top:1px solid #3ABFC4;margin-top:4px'>{dif:+,.0f}</div>", unsafe_allow_html=True)
-                    ytd_dif = fila.get("YTD", 0) - fila.get("YTD Promedio", 0)
-                    col_ytd_d = "#27AE60" if ytd_dif >= 0 else "#E74C3C"
-                    with cols_d[-1]:
-                        st.markdown(f"<div style='text-align:center;font-size:13px;font-weight:600;color:{col_ytd_d};padding:3px 0;border-top:1px solid #3ABFC4;margin-top:4px'>{ytd_dif:+,.0f}</div>", unsafe_allow_html=True)
+                        dif    = cli_v - prom_v
+                        filas_tabla[m] = [
+                            f"${cli_v:,.0f}",
+                            f"${prom_v:,.0f}",
+                            f"{dif:+,.0f}"
+                        ]
+                    ytd_v   = fila.get("YTD", 0)
+                    ytd_p   = fila.get("YTD Promedio", 0)
+                    ytd_dif = ytd_v - ytd_p
+                    filas_tabla["YTD"] = [
+                        f"${ytd_v:,.0f}",
+                        f"${ytd_p:,.0f}",
+                        f"{ytd_dif:+,.0f}"
+                    ]
+                    df_display = pd.DataFrame(filas_tabla).set_index("")
 
-                    st.markdown("</div>", unsafe_allow_html=True)
+                    def color_fila(row):
+                        styles = []
+                        for v in row:
+                            if row.name == "Cliente":
+                                styles.append("color:#3ABFC4;font-weight:600")
+                            elif row.name == "Dif. vs prom.":
+                                try:
+                                    num = float(str(v).replace(",","").replace("+","").replace("$",""))
+                                    styles.append("color:#27AE60;font-weight:600" if num >= 0 else "color:#E74C3C;font-weight:600")
+                                except:
+                                    styles.append("")
+                            else:
+                                styles.append("color:#555")
+                        return styles
+
+                    st.dataframe(
+                        df_display.style.apply(color_fila, axis=1),
+                        use_container_width=True
+                    )
             else:
                 st.info("No hay datos para este cliente con los meses seleccionados.")
 
