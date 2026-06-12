@@ -116,12 +116,96 @@ with st.sidebar:
     umbral      = st.number_input("Umbral mínimo para contar como venta ($)", value=10000, step=1000)
     col_hoja    = st.text_input("Hoja del Excel (vacío = primera hoja)", value="")
 
-archivo = st.file_uploader("Sube tu archivo Excel (.xlsx)", type=["xlsx"])
+# ── Modo de carga ────────────────────────────────────────────
+modo = st.radio("¿Cómo quieres cargar tu base de datos?",
+                ["Base consolidada (un solo archivo)", "Bases separadas por año (2025 + 2026)"],
+                horizontal=True, key="modo_carga")
+
+COLS_BASE = ["Cliente", "Ciudad", "Zona", "Mensajero"]
+
+def preparar_base(df_raw, anio, col_cli="Cliente"):
+    df_raw.columns = df_raw.columns.str.strip()
+    # Detectar columnas de meses (sin año) como Ene, Feb, Mar...
+    cols_meses = [c for c in df_raw.columns if c.capitalize() in MESES_ORDEN]
+    cols_info  = [c for c in df_raw.columns if c in COLS_BASE]
+    df_out = df_raw[cols_info + cols_meses].copy()
+    # Renombrar meses a formato Mes-AA
+    sufijo = str(anio)[-2:]
+    rename_map = {m: f"{m.capitalize()}-{sufijo}" for m in cols_meses}
+    df_out = df_out.rename(columns=rename_map)
+    df_out[col_cli] = df_out[col_cli].fillna("").astype(str).str.strip()
+    df_out = df_out[df_out[col_cli] != ""]
+    # Limpiar numéricos
+    for c in [rename_map[m] for m in cols_meses]:
+        df_out[c] = pd.to_numeric(
+            df_out[c].astype(str).str.replace(r"[\$\s,]", "", regex=True).str.strip().replace(["", "-"], "0"),
+            errors="coerce"
+        ).fillna(0)
+    return df_out
+
+if modo == "Bases separadas por año (2025 + 2026)":
+    col_u1, col_u2 = st.columns(2)
+    with col_u1:
+        st.markdown("**Base 2025**")
+        archivo_25 = st.file_uploader("Sube el Excel de 2025", type=["xlsx"], key="up25")
+        hoja_25 = st.text_input("Hoja 2025 (vacío = primera)", value="", key="hoja25")
+    with col_u2:
+        st.markdown("**Base 2026**")
+        archivo_26 = st.file_uploader("Sube el Excel de 2026", type=["xlsx"], key="up26")
+        hoja_26 = st.text_input("Hoja 2026 (vacío = primera)", value="", key="hoja26")
+
+    archivo = None
+    if archivo_25 and archivo_26:
+        try:
+            h25 = hoja_25.strip() if hoja_25.strip() else 0
+            h26 = hoja_26.strip() if hoja_26.strip() else 0
+            raw25 = pd.read_excel(archivo_25, sheet_name=h25)
+            raw26 = pd.read_excel(archivo_26, sheet_name=h26)
+            df25 = preparar_base(raw25, 2025)
+            df26 = preparar_base(raw26, 2026)
+
+            # Full outer merge por Cliente
+            cols_info_25 = [c for c in df25.columns if c in COLS_BASE]
+            cols_info_26 = [c for c in df26.columns if c in COLS_BASE]
+            meses_25 = [c for c in df25.columns if c not in COLS_BASE]
+            meses_26 = [c for c in df26.columns if c not in COLS_BASE]
+
+            df_merged = pd.merge(
+                df25, df26[["Cliente"] + meses_26],
+                on="Cliente", how="outer"
+            )
+            # Rellenar NaN en meses
+            for c in meses_25 + meses_26:
+                if c in df_merged.columns:
+                    df_merged[c] = df_merged[c].fillna(0)
+            # Rellenar info de ciudad/zona/mensajero
+            for c in ["Ciudad", "Zona", "Mensajero"]:
+                if c in df_merged.columns:
+                    df_merged[c] = df_merged[c].fillna("")
+
+            st.success(f"Bases combinadas: {len(df_merged):,} clientes | {len(meses_25)} meses 2025 + {len(meses_26)} meses 2026")
+
+            # Guardar en buffer para reutilizar
+            buffer_merged = io.BytesIO()
+            df_merged.to_excel(buffer_merged, index=False)
+            buffer_merged.seek(0)
+            archivo = buffer_merged
+            col_hoja = ""
+        except Exception as e:
+            st.error(f"Error al combinar bases: {e}")
+            st.exception(e)
+    elif archivo_25 or archivo_26:
+        st.info("Sube ambos archivos para combinar las bases.")
+else:
+    archivo = st.file_uploader("Sube tu archivo Excel (.xlsx)", type=["xlsx"], key="up_consolidado")
 
 if archivo:
     try:
         hoja = col_hoja if col_hoja.strip() else 0
-        df = pd.read_excel(archivo, sheet_name=hoja)
+        if isinstance(archivo, io.BytesIO):
+            df = pd.read_excel(archivo)
+        else:
+            df = pd.read_excel(archivo, sheet_name=hoja)
         df.columns = df.columns.str.strip()
 
         # Detectar columnas Mes-Año
