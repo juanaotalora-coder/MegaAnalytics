@@ -182,11 +182,12 @@ if modo == "Bases separadas por año (2025 + 2026)":
             df25 = preparar_base(raw25, 2025, col_cli=col_cliente)
             df26 = preparar_base(raw26, 2026, col_cli=col_cliente)
 
-            # Full outer merge por Cliente
-            cols_info_25 = [c for c in df25.columns if c in COLS_BASE]
-            cols_info_26 = [c for c in df26.columns if c in COLS_BASE]
-            meses_25 = [c for c in df25.columns if c not in COLS_BASE]
-            meses_26 = [c for c in df26.columns if c not in COLS_BASE]
+            # Full outer merge por columna de referencia
+            # Columnas de mes: las que tienen formato Mes-AA (detectadas por patrón)
+            import re as _re2
+            patron_mes = _re2.compile(r'^[A-Za-z]{3}-\d{2,4}$')
+            meses_25 = [c for c in df25.columns if patron_mes.match(str(c))]
+            meses_26 = [c for c in df26.columns if patron_mes.match(str(c))]
 
             df_merged = pd.merge(
                 df25, df26[[col_cliente] + meses_26],
