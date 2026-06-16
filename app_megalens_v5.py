@@ -293,110 +293,99 @@ if archivo:
 
         # 1. Detección de duplicados: exactos y por nombre similar
         from difflib import SequenceMatcher
+        import re as _re
 
         def similitud(a, b):
             return SequenceMatcher(None, a.lower().strip(), b.lower().strip()).ratio()
 
         def normalizar(s):
-            import re
             s = str(s).upper().strip()
-            s = re.sub(r'\s+', ' ', s)
+            s = _re.sub(r'\s+', ' ', s)
             for a, b in [('Á','A'),('É','E'),('Í','I'),('Ó','O'),('Ú','U')]:
                 s = s.replace(a, b)
             return s
 
-        clientes_lista = df[col_cliente].tolist()
+        df_reset = df.reset_index(drop=True)
+        clientes_lista = df_reset[col_cliente].tolist()
         clientes_norm  = [normalizar(c) for c in clientes_lista]
 
-        # Exactos (mismo nombre normalizado, diferentes filas)
-        pares_exactos = []
-        vistos = {}
+        # Agrupar índices por nombre normalizado
+        grupos_norm = {}
         for i, cn in enumerate(clientes_norm):
-            if cn in vistos:
-                pares_exactos.append((clientes_lista[vistos[cn]], clientes_lista[i]))
-            else:
-                vistos[cn] = i
+            grupos_norm.setdefault(cn, []).append(i)
+
+        grupos_duplicados = {cn: idxs for cn, idxs in grupos_norm.items() if len(idxs) > 1}
 
         # Similares (>85% similitud, no exactos)
+        nombres_norm_unicos = list(grupos_norm.keys())
         pares_similares = []
-        n = len(clientes_lista)
-        for i in range(n):
-            for j in range(i+1, n):
-                if clientes_norm[i] == clientes_norm[j]:
-                    continue  # ya capturado como exacto
-                sim = similitud(clientes_norm[i], clientes_norm[j])
+        for i in range(len(nombres_norm_unicos)):
+            for j in range(i+1, len(nombres_norm_unicos)):
+                cn1, cn2 = nombres_norm_unicos[i], nombres_norm_unicos[j]
+                sim = similitud(cn1, cn2)
                 if sim >= 0.85:
-                    # Determinar recomendación
-                    vtas_i = df[cols_orden].iloc[i].sum() if cols_orden else 0
-                    vtas_j = df[cols_orden].iloc[j].sum() if cols_orden else 0
-                    # Si uno tiene ventas en periodos donde el otro no, recomendar fusión
-                    if vtas_i > 0 and vtas_j > 0:
-                        rec = "fusionar"
-                    else:
-                        rec = "eliminar el que no vende"
-                    pares_similares.append((clientes_lista[i], clientes_lista[j], round(sim*100), rec))
+                    idxs1 = grupos_norm[cn1]
+                    idxs2 = grupos_norm[cn2]
+                    vtas1 = df_reset[cols_orden].iloc[idxs1].sum().sum() if cols_orden else 0
+                    vtas2 = df_reset[cols_orden].iloc[idxs2].sum().sum() if cols_orden else 0
+                    rec = "fusionar" if vtas1 > 0 and vtas2 > 0 else "eliminar el que no vende"
+                    pares_similares.append((clientes_lista[idxs1[0]], clientes_lista[idxs2[0]], round(sim*100), rec, idxs1, idxs2))
 
-        eliminaciones_aprobadas = set()
-        fusiones_similares = []
+        indices_a_eliminar = set()
+        fusiones_a_aplicar = []
 
-        if pares_exactos or pares_similares:
-            n_alertas = len(pares_exactos) + len(pares_similares)
+        if grupos_duplicados or pares_similares:
+            n_alertas = len(grupos_duplicados) + len(pares_similares)
             with st.expander(f"⚠️ Se detectaron {n_alertas} posibles problemas de nombres", expanded=True):
 
-                if pares_exactos:
-                    st.markdown("**Duplicados exactos** — Recomendación: eliminar la fila extra")
-                    for c1, c2 in pares_exactos:
-                        col_a, col_b = st.columns([3,1])
-                        with col_a:
-                            st.markdown(f"- `{c1}` aparece más de una vez")
-                        with col_b:
-                            if st.checkbox("Eliminar extra", key=f"dup_ex_{c1}"):
-                                eliminaciones_aprobadas.add(c1)
+                if grupos_duplicados:
+                    st.markdown("**Duplicados exactos** — Selecciona cuáles filas eliminar")
+                    for cn, idxs in grupos_duplicados.items():
+                        st.markdown(f"**`{clientes_lista[idxs[0]]}`** — {len(idxs)} filas detectadas:")
+                        cols_mostrar = [col_cliente] + ([col_ciudad] if col_ciudad in df_reset.columns else []) + cols_orden[:6]
+                        filas_grupo = df_reset.iloc[idxs][cols_mostrar]
+                        st.dataframe(filas_grupo.style.format(
+                            {c: "${:,.0f}" for c in cols_orden[:6] if c in filas_grupo.columns}
+                        ), use_container_width=True, hide_index=False)
+                        for pos, idx in enumerate(idxs[1:], 1):
+                            if st.checkbox(f"Eliminar fila {idx} (fila {pos+1})", key=f"dup_{cn}_{idx}"):
+                                indices_a_eliminar.add(idx)
+                        st.markdown("---")
 
                 if pares_similares:
-                    st.markdown("---")
-                    st.markdown("**Nombres similares** — Pueden ser el mismo cliente con nombre diferente")
-                    for c1, c2, sim, rec in pares_similares:
-                        vtas1 = df[df[col_cliente]==c1][cols_orden].sum(axis=1).sum() if cols_orden else 0
-                        vtas2 = df[df[col_cliente]==c2][cols_orden].sum(axis=1).sum() if cols_orden else 0
-                        col_a, col_b, col_c = st.columns([3, 1, 1])
+                    st.markdown("**Nombres similares** — Pueden ser el mismo cliente")
+                    for c1, c2, sim, rec, idxs1, idxs2 in pares_similares:
+                        st.markdown(f"**`{c1}`** ↔ **`{c2}`** ({sim}% similitud) · Recomendación: *{rec}*")
+                        cols_mostrar = [col_cliente] + ([col_ciudad] if col_ciudad in df_reset.columns else []) + cols_orden[:6]
+                        filas_par = df_reset.iloc[idxs1 + idxs2][cols_mostrar]
+                        st.dataframe(filas_par.style.format(
+                            {c: "${:,.0f}" for c in cols_orden[:6] if c in filas_par.columns}
+                        ), use_container_width=True, hide_index=False)
+                        col_a, col_b, col_c = st.columns(3)
                         with col_a:
-                            st.markdown(f"- `{c1}` ↔ `{c2}` ({sim}% similitud)")
-                            st.caption(f"Ventas: ${vtas1:,.0f} vs ${vtas2:,.0f} · Recomendación: {rec}")
+                            if st.checkbox("Fusionar (sumar ventas)", key=f"fus_{c1}_{c2}_{sim}"):
+                                fusiones_a_aplicar.append((idxs1, idxs2))
                         with col_b:
-                            if st.checkbox("Fusionar", key=f"sim_fus_{c1}_{c2}"):
-                                fusiones_similares.append((c1, c2))
+                            if st.checkbox(f"Eliminar '{c2}'", key=f"del2_{c1}_{c2}_{sim}"):
+                                for idx in idxs2:
+                                    indices_a_eliminar.add(idx)
                         with col_c:
-                            if st.checkbox("Eliminar 2do", key=f"sim_del_{c1}_{c2}"):
-                                eliminaciones_aprobadas.add(c2)
+                            if st.checkbox(f"Eliminar '{c1}'", key=f"del1_{c1}_{c2}_{sim}"):
+                                for idx in idxs1:
+                                    indices_a_eliminar.add(idx)
+                        st.markdown("---")
 
-                if eliminaciones_aprobadas or fusiones_similares:
+                if indices_a_eliminar or fusiones_a_aplicar:
                     if st.button("Aplicar correcciones seleccionadas"):
-                        # Eliminar extras exactos
-                        for nombre in eliminaciones_aprobadas:
-                            norm = normalizar(nombre)
-                            idxs = [i for i, cn in enumerate(clientes_norm) if cn == norm]
-                            if len(idxs) > 1:
-                                df = df.drop(df.index[idxs[1:]])
-                                clientes_norm = [normalizar(c) for c in df[col_cliente].tolist()]
-                            else:
-                                # eliminar por nombre exacto (caso similar)
-                                mask = df[col_cliente] == nombre
-                                if mask.sum() > 0:
-                                    df = df.drop(df[mask].index)
-
-                        # Fusionar similares
-                        for c1, c2 in fusiones_similares:
-                            idx1 = df[df[col_cliente] == c1].index
-                            idx2 = df[df[col_cliente] == c2].index
-                            if len(idx1) > 0 and len(idx2) > 0:
-                                for col in cols_orden:
-                                    if col in df.columns:
-                                        df.at[idx1[0], col] = df.at[idx1[0], col] + df.at[idx2[0], col]
-                                df = df.drop(idx2)
-
-                        st.session_state["df_fusionado"] = df
-                        st.success("Correcciones aplicadas.")
+                        df_nuevo = df_reset.copy()
+                        for idxs1, idxs2 in fusiones_a_aplicar:
+                            for col in cols_orden:
+                                if col in df_nuevo.columns:
+                                    df_nuevo.at[idxs1[0], col] += df_nuevo.iloc[idxs2].get(col, 0).sum()
+                            indices_a_eliminar.update(idxs2)
+                        df_nuevo = df_nuevo.drop(index=list(indices_a_eliminar)).reset_index(drop=True)
+                        st.session_state["df_fusionado"] = df_nuevo
+                        st.success(f"Correcciones aplicadas. Filas eliminadas: {len(indices_a_eliminar)}")
                         st.rerun()
         else:
             st.success("✅ No se detectaron duplicados ni nombres similares.")
