@@ -125,6 +125,15 @@ modo = st.radio("¿Cómo quieres cargar tu base de datos?",
 
 COLS_BASE = ["Cliente", "Ciudad", "Zona", "Mensajero"]
 
+def leer_excel(archivo, sheet=0):
+    nombre = archivo.name if hasattr(archivo, "name") else ""
+    engine = "xlrd" if str(nombre).endswith(".xls") else "openpyxl"
+    try:
+        return pd.read_excel(archivo, sheet_name=sheet, engine=engine)
+    except Exception:
+        archivo.seek(0)
+        return pd.read_excel(archivo, sheet_name=sheet)
+
 def preparar_base(df_raw, anio, col_cli="Cliente"):
     df_raw.columns = df_raw.columns.str.strip()
     # Detectar columnas de meses (sin año) como Ene, Feb, Mar...
@@ -149,11 +158,11 @@ if modo == "Bases separadas por año (2025 + 2026)":
     col_u1, col_u2 = st.columns(2)
     with col_u1:
         st.markdown("**Base 2025**")
-        archivo_25 = st.file_uploader("Sube el Excel de 2025", type=["xlsx"], key="up25")
+        archivo_25 = st.file_uploader("Sube el Excel de 2025", type=["xlsx","xls"], key="up25")
         hoja_25 = st.text_input("Hoja 2025 (vacío = primera)", value="", key="hoja25")
     with col_u2:
         st.markdown("**Base 2026**")
-        archivo_26 = st.file_uploader("Sube el Excel de 2026", type=["xlsx"], key="up26")
+        archivo_26 = st.file_uploader("Sube el Excel de 2026", type=["xlsx","xls"], key="up26")
         hoja_26 = st.text_input("Hoja 2026 (vacío = primera)", value="", key="hoja26")
 
     archivo = None
@@ -161,8 +170,8 @@ if modo == "Bases separadas por año (2025 + 2026)":
         try:
             h25 = hoja_25.strip() if hoja_25.strip() else 0
             h26 = hoja_26.strip() if hoja_26.strip() else 0
-            raw25 = pd.read_excel(archivo_25, sheet_name=h25)
-            raw26 = pd.read_excel(archivo_26, sheet_name=h26)
+            raw25 = leer_excel(archivo_25, h25)
+            raw26 = leer_excel(archivo_26, h26)
             df25 = preparar_base(raw25, 2025)
             df26 = preparar_base(raw26, 2026)
 
@@ -199,7 +208,7 @@ if modo == "Bases separadas por año (2025 + 2026)":
     elif archivo_25 or archivo_26:
         st.info("Sube ambos archivos para combinar las bases.")
 else:
-    archivo = st.file_uploader("Sube tu archivo Excel (.xlsx)", type=["xlsx"], key="up_consolidado")
+    archivo = st.file_uploader("Sube tu archivo Excel (.xlsx o .xls)", type=["xlsx","xls"], key="up_consolidado")
 
 if archivo:
     try:
@@ -207,7 +216,7 @@ if archivo:
         if isinstance(archivo, io.BytesIO):
             df = pd.read_excel(archivo)
         else:
-            df = pd.read_excel(archivo, sheet_name=hoja)
+            df = leer_excel(archivo, hoja)
         df.columns = df.columns.str.strip()
 
         # Detectar columnas Mes-Año
