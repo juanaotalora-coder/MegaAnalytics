@@ -355,11 +355,16 @@ if archivo:
                         st.dataframe(filas_grupo.style.format(
                             {c: "${:,.0f}" for c in cols_orden if c in filas_grupo.columns}
                         ), use_container_width=True, hide_index=False)
-                        col_a, col_b = st.columns(2)
+                        col_a, col_b, col_c = st.columns(3)
                         with col_a:
-                            if st.checkbox("Fusionar todas en una (sumar ventas)", key=f"fus_dup_{cn}"):
-                                fusiones_a_aplicar.append((idxs[:1], idxs[1:]))
+                            if st.checkbox("Fusionar todas (sumar todos los meses)", key=f"fus_dup_{cn}"):
+                                fusiones_a_aplicar.append((idxs[:1], idxs[1:], "todos"))
                         with col_b:
+                            anios_disp = sorted(set(int(c.split("-")[1]) + 2000 for c in cols_orden if "-" in c))
+                            for anio_f in anios_disp:
+                                if st.checkbox(f"Fusionar solo {anio_f}", key=f"fus_dup_{cn}_{anio_f}"):
+                                    fusiones_a_aplicar.append((idxs[:1], idxs[1:], str(anio_f)))
+                        with col_c:
                             st.markdown("**O elimina filas específicas:**")
                             for pos, idx in enumerate(idxs[1:], 1):
                                 if st.checkbox(f"Eliminar fila {pos+1}", key=f"dup_{cn}_{idx}"):
@@ -378,7 +383,7 @@ if archivo:
                         col_a, col_b, col_c = st.columns(3)
                         with col_a:
                             if st.checkbox("Fusionar (sumar ventas)", key=f"fus_{c1}_{c2}_{sim}"):
-                                fusiones_a_aplicar.append((idxs1, idxs2))
+                                fusiones_a_aplicar.append((idxs1, idxs2, "todos"))
                         with col_b:
                             if st.checkbox(f"Eliminar '{c2}'", key=f"del2_{c1}_{c2}_{sim}"):
                                 for idx in idxs2:
@@ -392,10 +397,16 @@ if archivo:
                 if indices_a_eliminar or fusiones_a_aplicar:
                     if st.button("Aplicar correcciones seleccionadas"):
                         df_nuevo = df_reset.copy()
-                        for idxs1, idxs2 in fusiones_a_aplicar:
+                        for idxs1, idxs2, anio_fus in fusiones_a_aplicar:
                             for col in cols_orden:
-                                if col in df_nuevo.columns:
-                                    df_nuevo.at[idxs1[0], col] += df_nuevo.iloc[idxs2].get(col, 0).sum()
+                                if col not in df_nuevo.columns:
+                                    continue
+                                # Filtrar por año si aplica
+                                if anio_fus != "todos":
+                                    sufijo = str(anio_fus)[-2:]
+                                    if not col.endswith(f"-{sufijo}"):
+                                        continue
+                                df_nuevo.at[idxs1[0], col] += df_nuevo.iloc[idxs2][col].sum()
                             indices_a_eliminar.update(idxs2)
                         df_nuevo = df_nuevo.drop(index=list(indices_a_eliminar)).reset_index(drop=True)
                         st.session_state["df_fusionado"] = df_nuevo
