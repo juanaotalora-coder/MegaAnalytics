@@ -111,7 +111,7 @@ MESES_ORDEN = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov"
 
 with st.sidebar:
     with st.expander("⚙️ Configuración", expanded=False):
-        col_cliente = st.text_input("Columna de cliente", value="Cliente")
+        col_cliente = st.text_input("Columna de Referencia", value="Cliente")
         col_ciudad  = st.text_input("Columna de ciudad",  value="Ciudad")
         col_hoja    = st.text_input("Hoja del Excel (vacío = primera hoja)", value="")
 
@@ -134,7 +134,7 @@ def leer_excel(archivo, sheet=0):
         archivo.seek(0)
         return pd.read_excel(archivo, sheet_name=sheet)
 
-def preparar_base(df_raw, anio, col_cli="Cliente"):
+def preparar_base(df_raw, anio, col_cli="Cliente"):  # col_cli viene de col_cliente
     df_raw.columns = df_raw.columns.str.strip()
     # Detectar columnas de meses (sin año) como Ene, Feb, Mar...
     cols_meses = [c for c in df_raw.columns if c.capitalize() in MESES_ORDEN]
@@ -900,7 +900,7 @@ if archivo:
 
         st.divider()
 
-        tab3, tab4, tab6 = st.tabs(["Top clientes", "Análisis por cliente", "Tabla completa"])
+        tab3, tab4, tab6 = st.tabs(["Top registros", "Análisis por registro", "Tabla completa"])
 
         with tab3:
             # YTD: para año actual hasta mes anterior al actual,
@@ -922,7 +922,7 @@ if archivo:
             top = df.sort_values("_venta_periodo", ascending=True).tail(20)
             top_text = top["_venta_periodo"].apply(lambda x: f"${x:,.0f}")
             fig4 = px.bar(top, x="_venta_periodo", y=col_cliente, orientation="h",
-                          title=f"Top 20 clientes — {periodo_label}",
+                          title=f"Top 20 {col_cliente}s — {periodo_label}",
                           text=top_text,
                           color="_venta_periodo", color_continuous_scale="Blues",
                           labels={"_venta_periodo": f"Ventas ({periodo_label})"})
@@ -951,11 +951,11 @@ if archivo:
 
         with tab4:
             st.info("El período de análisis no aplica en esta pestaña. Se muestra el detalle mes a mes del cliente seleccionado.")
-            st.subheader("Ventas por cliente")
+            st.subheader(f"Ventas por {col_cliente}")
 
             # Selector de cliente
             clientes = sorted(df[col_cliente].unique().tolist())
-            cliente_sel = st.selectbox("Selecciona un cliente", clientes)
+            cliente_sel = st.selectbox(f"Selecciona un {col_cliente}", clientes)
 
             df_cli = df[df[col_cliente] == cliente_sel].copy()
 
