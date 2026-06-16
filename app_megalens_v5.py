@@ -350,10 +350,10 @@ if archivo:
                     st.markdown("**Duplicados exactos**")
                     for cn, idxs in grupos_duplicados.items():
                         st.markdown(f"**`{clientes_lista[idxs[0]]}`** — {len(idxs)} filas detectadas:")
-                        cols_mostrar = [col_cliente] + ([col_ciudad] if col_ciudad in df_reset.columns else []) + cols_orden[:6]
+                        cols_mostrar = [col_cliente] + ([col_ciudad] if col_ciudad in df_reset.columns else []) + cols_orden
                         filas_grupo = df_reset.iloc[idxs][cols_mostrar]
                         st.dataframe(filas_grupo.style.format(
-                            {c: "${:,.0f}" for c in cols_orden[:6] if c in filas_grupo.columns}
+                            {c: "${:,.0f}" for c in cols_orden if c in filas_grupo.columns}
                         ), use_container_width=True, hide_index=False)
                         col_a, col_b = st.columns(2)
                         with col_a:
@@ -370,10 +370,10 @@ if archivo:
                     st.markdown("**Nombres similares** — Pueden ser el mismo cliente")
                     for c1, c2, sim, rec, idxs1, idxs2 in pares_similares:
                         st.markdown(f"**`{c1}`** ↔ **`{c2}`** ({sim}% similitud) · Recomendación: *{rec}*")
-                        cols_mostrar = [col_cliente] + ([col_ciudad] if col_ciudad in df_reset.columns else []) + cols_orden[:6]
+                        cols_mostrar = [col_cliente] + ([col_ciudad] if col_ciudad in df_reset.columns else []) + cols_orden
                         filas_par = df_reset.iloc[idxs1 + idxs2][cols_mostrar]
                         st.dataframe(filas_par.style.format(
-                            {c: "${:,.0f}" for c in cols_orden[:6] if c in filas_par.columns}
+                            {c: "${:,.0f}" for c in cols_orden if c in filas_par.columns}
                         ), use_container_width=True, hide_index=False)
                         col_a, col_b, col_c = st.columns(3)
                         with col_a:
