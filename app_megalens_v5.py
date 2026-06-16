@@ -134,7 +134,7 @@ def leer_excel(archivo, sheet=0):
         archivo.seek(0)
         return pd.read_excel(archivo, sheet_name=sheet)
 
-def preparar_base(df_raw, anio, col_cli="Cliente"):  # col_cli viene de col_cliente
+def preparar_base(df_raw, anio, col_cli="Cliente"):
     df_raw.columns = df_raw.columns.str.strip()
     # Detectar columnas de meses (sin año) como Ene, Feb, Mar...
     cols_meses = [c for c in df_raw.columns if c.capitalize() in MESES_ORDEN]
@@ -172,8 +172,8 @@ if modo == "Bases separadas por año (2025 + 2026)":
             h26 = hoja_26.strip() if hoja_26.strip() else 0
             raw25 = leer_excel(archivo_25, h25)
             raw26 = leer_excel(archivo_26, h26)
-            df25 = preparar_base(raw25, 2025)
-            df26 = preparar_base(raw26, 2026)
+            df25 = preparar_base(raw25, 2025, col_cli=col_cliente)
+            df26 = preparar_base(raw26, 2026, col_cli=col_cliente)
 
             # Full outer merge por Cliente
             cols_info_25 = [c for c in df25.columns if c in COLS_BASE]
@@ -182,8 +182,8 @@ if modo == "Bases separadas por año (2025 + 2026)":
             meses_26 = [c for c in df26.columns if c not in COLS_BASE]
 
             df_merged = pd.merge(
-                df25, df26[["Cliente"] + meses_26],
-                on="Cliente", how="outer"
+                df25, df26[[col_cliente] + meses_26],
+                on=col_cliente, how="outer"
             )
             # Rellenar NaN en meses
             for c in meses_25 + meses_26:
