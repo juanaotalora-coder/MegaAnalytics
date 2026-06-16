@@ -282,31 +282,115 @@ if archivo:
         if "df_fusionado" in st.session_state:
             df = st.session_state["df_fusionado"].copy()
 
-        # 1. Duplicados exactos
-        dupes_exactos = df[df.duplicated(subset=[col_cliente] + cols_orden, keep=False)]
-        pares_dupes = []
-        if len(dupes_exactos) > 0:
-            for nombre, grupo in dupes_exactos.groupby(col_cliente):
-                if len(grupo) > 1:
-                    pares_dupes.append(nombre)
+        # 1. Detección de duplicados: exactos y por nombre similar
+        from difflib import SequenceMatcher
+
+        def similitud(a, b):
+            return SequenceMatcher(None, a.lower().strip(), b.lower().strip()).ratio()
+
+        def normalizar(s):
+            import re
+            s = str(s).upper().strip()
+            s = re.sub(r'\s+', ' ', s)
+            for a, b in [('Á','A'),('É','E'),('Í','I'),('Ó','O'),('Ú','U')]:
+                s = s.replace(a, b)
+            return s
+
+        clientes_lista = df[col_cliente].tolist()
+        clientes_norm  = [normalizar(c) for c in clientes_lista]
+
+        # Exactos (mismo nombre normalizado, diferentes filas)
+        pares_exactos = []
+        vistos = {}
+        for i, cn in enumerate(clientes_norm):
+            if cn in vistos:
+                pares_exactos.append((clientes_lista[vistos[cn]], clientes_lista[i]))
+            else:
+                vistos[cn] = i
+
+        # Similares (>85% similitud, no exactos)
+        pares_similares = []
+        n = len(clientes_lista)
+        for i in range(n):
+            for j in range(i+1, n):
+                if clientes_norm[i] == clientes_norm[j]:
+                    continue  # ya capturado como exacto
+                sim = similitud(clientes_norm[i], clientes_norm[j])
+                if sim >= 0.85:
+                    # Determinar recomendación
+                    vtas_i = df[cols_orden].iloc[i].sum() if cols_orden else 0
+                    vtas_j = df[cols_orden].iloc[j].sum() if cols_orden else 0
+                    # Si uno tiene ventas en periodos donde el otro no, recomendar fusión
+                    if vtas_i > 0 and vtas_j > 0:
+                        rec = "fusionar"
+                    else:
+                        rec = "eliminar el que no vende"
+                    pares_similares.append((clientes_lista[i], clientes_lista[j], round(sim*100), rec))
 
         eliminaciones_aprobadas = set()
-        if pares_dupes:
-            with st.expander("⚠️ Registros duplicados exactos detectados", expanded=True):
-                st.caption("Marca los que quieras eliminar (se conserva solo una fila).")
-                for nombre in pares_dupes:
-                    if st.checkbox(f"Eliminar duplicado: {nombre}", key=f"dup_{nombre}"):
-                        eliminaciones_aprobadas.add(nombre)
-                if eliminaciones_aprobadas:
-                    if st.button("Eliminar duplicados seleccionados"):
+        fusiones_similares = []
+
+        if pares_exactos or pares_similares:
+            n_alertas = len(pares_exactos) + len(pares_similares)
+            with st.expander(f"⚠️ Se detectaron {n_alertas} posibles problemas de nombres", expanded=True):
+
+                if pares_exactos:
+                    st.markdown("**Duplicados exactos** — Recomendación: eliminar la fila extra")
+                    for c1, c2 in pares_exactos:
+                        col_a, col_b = st.columns([3,1])
+                        with col_a:
+                            st.markdown(f"- `{c1}` aparece más de una vez")
+                        with col_b:
+                            if st.checkbox("Eliminar extra", key=f"dup_ex_{c1}"):
+                                eliminaciones_aprobadas.add(c1)
+
+                if pares_similares:
+                    st.markdown("---")
+                    st.markdown("**Nombres similares** — Pueden ser el mismo cliente con nombre diferente")
+                    for c1, c2, sim, rec in pares_similares:
+                        vtas1 = df[df[col_cliente]==c1][cols_orden].sum(axis=1).sum() if cols_orden else 0
+                        vtas2 = df[df[col_cliente]==c2][cols_orden].sum(axis=1).sum() if cols_orden else 0
+                        col_a, col_b, col_c = st.columns([3, 1, 1])
+                        with col_a:
+                            st.markdown(f"- `{c1}` ↔ `{c2}` ({sim}% similitud)")
+                            st.caption(f"Ventas: ${vtas1:,.0f} vs ${vtas2:,.0f} · Recomendación: {rec}")
+                        with col_b:
+                            if st.checkbox("Fusionar", key=f"sim_fus_{c1}_{c2}"):
+                                fusiones_similares.append((c1, c2))
+                        with col_c:
+                            if st.checkbox("Eliminar 2do", key=f"sim_del_{c1}_{c2}"):
+                                eliminaciones_aprobadas.add(c2)
+
+                if eliminaciones_aprobadas or fusiones_similares:
+                    if st.button("Aplicar correcciones seleccionadas"):
+                        # Eliminar extras exactos
                         for nombre in eliminaciones_aprobadas:
-                            idx_dupes = df[df[col_cliente] == nombre].index[1:]
-                            df = df.drop(idx_dupes)
+                            norm = normalizar(nombre)
+                            idxs = [i for i, cn in enumerate(clientes_norm) if cn == norm]
+                            if len(idxs) > 1:
+                                df = df.drop(df.index[idxs[1:]])
+                                clientes_norm = [normalizar(c) for c in df[col_cliente].tolist()]
+                            else:
+                                # eliminar por nombre exacto (caso similar)
+                                mask = df[col_cliente] == nombre
+                                if mask.sum() > 0:
+                                    df = df.drop(df[mask].index)
+
+                        # Fusionar similares
+                        for c1, c2 in fusiones_similares:
+                            idx1 = df[df[col_cliente] == c1].index
+                            idx2 = df[df[col_cliente] == c2].index
+                            if len(idx1) > 0 and len(idx2) > 0:
+                                for col in cols_orden:
+                                    if col in df.columns:
+                                        df.at[idx1[0], col] = df.at[idx1[0], col] + df.at[idx2[0], col]
+                                df = df.drop(idx2)
+
                         st.session_state["df_fusionado"] = df
-                        st.success("Duplicados eliminados.")
+                        st.success("Correcciones aplicadas.")
                         st.rerun()
         else:
-            st.success("No se detectaron duplicados exactos.")
+            st.success("✅ No se detectaron duplicados ni nombres similares.")
 
         # 2. Agrupación manual
         clientes_alfa = sorted(df[col_cliente].unique().tolist())
