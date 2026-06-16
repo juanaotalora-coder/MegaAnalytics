@@ -543,45 +543,76 @@ if archivo:
             # Clientes retomados: no compraron el mes anterior pero sí en el más reciente
             mask_retomados = compro_reciente & ~compro_ant & ~mask_nuevos
 
-            df_nuevos   = df[mask_nuevos][[col_cliente] + ([col_ciudad] if col_ciudad in df.columns else []) + [mes_rec_col]].copy()
-            df_retomados = df[mask_retomados][[col_cliente] + ([col_ciudad] if col_ciudad in df.columns else []) + [mes_rec_col]].copy()
-            df_nuevos[mes_rec_col] = df_nuevos[mes_rec_col].apply(lambda x: f"${x:,.0f}")
-            df_retomados[mes_rec_col] = df_retomados[mes_rec_col].apply(lambda x: f"${x:,.0f}")
+            # Clientes activos 2 meses consecutivos recientes
+            if idx_ref >= 1:
+                mes_ant2_label, mes_ant2_col = todos_pares[idx_ref - 1]
+                compro_ant2 = df[mes_ant2_col] >= umbral
+                mask_2m = compro_reciente & compro_ant2
+            else:
+                mask_2m = pd.Series([False] * len(df), index=df.index)
 
-            cn1, cn2 = st.columns(2)
-            with cn1:
-                st.markdown(f"**Clientes Nuevos** en {mes_rec_label}: **{len(df_nuevos)}**")
+            # Clientes en fuga
+            mask_fuga = compro_ant & ~compro_reciente
+
+            # Construir dataframes con valores numéricos para ordenamiento correcto
+            cols_base_df = [col_cliente] + ([col_ciudad] if col_ciudad in df.columns else [])
+
+            df_nuevos    = df[mask_nuevos][cols_base_df + [mes_rec_col]].copy()
+            df_retomados = df[mask_retomados][cols_base_df + [mes_rec_col]].copy()
+            df_2m        = df[mask_2m][cols_base_df + [mes_ant_col, mes_rec_col]].copy()
+            df_fuga      = df[mask_fuga][cols_base_df + [mes_ant_col]].copy()
+
+            # Renombrar columnas
+            df_nuevos    = df_nuevos.rename(columns={mes_rec_col: f"Venta {mes_rec_label}"})
+            df_retomados = df_retomados.rename(columns={mes_rec_col: f"Venta {mes_rec_label}"})
+            df_2m        = df_2m.rename(columns={mes_ant_col: f"Venta {mes_ant_label}", mes_rec_col: f"Venta {mes_rec_label}"})
+            df_fuga      = df_fuga.rename(columns={mes_ant_col: f"Última venta ({mes_ant_label})"})
+
+            # Mostrar en tabs dentro de la sección
+            subtab_n, subtab_r, subtab_2m, subtab_f = st.tabs([
+                f"🆕 Nuevos ({len(df_nuevos)})",
+                f"🔄 Retomados ({len(df_retomados)})",
+                f"⭐ Activos 2 meses ({len(df_2m)})",
+                f"⚠️ En fuga ({len(df_fuga)})"
+            ])
+
+            col_venta_n = f"Venta {mes_rec_label}"
+            col_venta_r = f"Venta {mes_rec_label}"
+            col_venta_f = f"Última venta ({mes_ant_label})"
+
+            with subtab_n:
                 st.caption(f"Compraron en {mes_rec_label} pero no en los 3 meses anteriores.")
                 if len(df_nuevos) > 0:
-                    st.dataframe(df_nuevos.rename(columns={mes_rec_col: f"Venta {mes_rec_label}"}),
+                    st.dataframe(df_nuevos.style.format({col_venta_n: "${:,.0f}"}),
                                  hide_index=True, use_container_width=True)
                 else:
                     st.info("No hay clientes nuevos en este período.")
 
-            with cn2:
-                st.markdown(f"**Clientes Retomados** en {mes_rec_label}: **{len(df_retomados)}**")
+            with subtab_r:
                 st.caption(f"No compraron en {mes_ant_label} pero sí en {mes_rec_label}.")
                 if len(df_retomados) > 0:
-                    st.dataframe(df_retomados.rename(columns={
-                        mes_ant_col: f"Venta {mes_ant_label}",
-                        mes_rec_col: f"Venta {mes_rec_label}"
-                    }), hide_index=True, use_container_width=True)
+                    st.dataframe(df_retomados.style.format({col_venta_r: "${:,.0f}"}),
+                                 hide_index=True, use_container_width=True)
                 else:
                     st.info("No hay clientes retomados en este período.")
-            # Clientes en fuga
-            mask_fuga = compro_ant & ~compro_reciente
-            df_fuga = df[mask_fuga][[col_cliente] + ([col_ciudad] if col_ciudad in df.columns else []) + [mes_ant_col]].copy()
-            df_fuga[mes_ant_col] = df_fuga[mes_ant_col].apply(lambda x: f"${x:,.0f}")
 
-            st.markdown("<br>", unsafe_allow_html=True)
-            st.markdown(f"**Clientes en Fuga** en {mes_rec_label}: **{len(df_fuga)}**")
-            st.caption(f"Compraron en {mes_ant_label} pero no en {mes_rec_label}.")
-            if len(df_fuga) > 0:
-                st.dataframe(df_fuga.rename(columns={
-                    mes_ant_col: f"Última venta ({mes_ant_label})"
-                }), hide_index=True, use_container_width=True)
-            else:
-                st.info("No hay clientes en fuga en este período.")
+            with subtab_2m:
+                st.caption(f"Compraron tanto en {mes_ant_label} como en {mes_rec_label}.")
+                if len(df_2m) > 0:
+                    st.dataframe(df_2m.style.format({
+                        f"Venta {mes_ant_label}": "${:,.0f}",
+                        f"Venta {mes_rec_label}": "${:,.0f}"
+                    }), hide_index=True, use_container_width=True)
+                else:
+                    st.info("No hay clientes activos 2 meses consecutivos.")
+
+            with subtab_f:
+                st.caption(f"Compraron en {mes_ant_label} pero no en {mes_rec_label}.")
+                if len(df_fuga) > 0:
+                    st.dataframe(df_fuga.style.format({col_venta_f: "${:,.0f}"}),
+                                 hide_index=True, use_container_width=True)
+                else:
+                    st.info("No hay clientes en fuga en este período.")
 
         else:
             st.info("Se necesitan al menos 2 meses de datos para calcular estas métricas.")
@@ -968,39 +999,39 @@ if archivo:
                 st.markdown("<br>", unsafe_allow_html=True)
 
                 # Gráfica scatter
-                fig_foda = px.scatter(
-                    df_foda, x="vs_prom", y="var_pct",
-                    color="categoria",
-                    color_discrete_map=color_map,
-                    hover_name=col_cliente,
-                    hover_data={"vta_actual": ":,.0f", "var_pct": ":.1f", "vs_prom": False},
-                    labels={"vs_prom": "Posición vs promedio ciudad",
-                            "var_pct": "Variación vs mes anterior (%)",
-                            "categoria": "Categoría",
-                            "vta_actual": f"Venta {mes_foda_label}"},
-                    title=f"Matriz FODA — {periodo_label}",
-                    size="vta_actual",
-                    size_max=40,
-                )
-                fig_foda.update_traces(marker=dict(opacity=0.8, line=dict(width=1, color="white")))
-                fig_foda.add_hline(y=0, line_dash="dot", line_color="#555", line_width=2)
-                fig_foda.add_vline(x=0, line_dash="dot", line_color="#555", line_width=2)
-                fig_foda.add_annotation(x=0.02, y=0.98, xref="paper", yref="paper",
-                    text="Oportunidades", showarrow=False, font=dict(color="#3ABFC4", size=12, family="Arial Black"))
-                fig_foda.add_annotation(x=0.98, y=0.98, xref="paper", yref="paper",
-                    text="Fortalezas", showarrow=False, font=dict(color="#6DB33F", size=12, family="Arial Black"),
-                    xanchor="right")
-                fig_foda.add_annotation(x=0.02, y=0.02, xref="paper", yref="paper",
-                    text="Debilidades", showarrow=False, font=dict(color="#B8860B", size=12, family="Arial Black"))
-                fig_foda.add_annotation(x=0.98, y=0.02, xref="paper", yref="paper",
-                    text="Amenazas", showarrow=False, font=dict(color="#E67E22", size=12, family="Arial Black"),
-                    xanchor="right")
-                fig_foda.update_xaxes(showticklabels=False, zeroline=False)
-                fig_foda.update_yaxes(zeroline=False)
-                fig_foda.update_layout(height=560, plot_bgcolor="#FAFAFA",
-                                       paper_bgcolor="white",
-                                       legend=dict(orientation="h", y=-0.15))
-                st.plotly_chart(fig_foda, use_container_width=True)
+                # Tabla de cuadrantes FODA
+                col_q1, col_q2 = st.columns(2)
+                col_q3, col_q4 = st.columns(2)
+
+                def tabla_cuadrante(col_widget, cat, color_bg, color_border, emoji):
+                    grupo = df_foda[df_foda["categoria"] == cat][[
+                        col_cliente] + ([col_ciudad] if col_ciudad in df.columns else []) +
+                        ["vta_actual", "var_pct"]
+                    ].sort_values("vta_actual", ascending=False).copy()
+                    grupo = grupo.rename(columns={
+                        "vta_actual": f"Venta {mes_foda_label}",
+                        "var_pct": "Var. vs mes ant. (%)"
+                    })
+                    with col_widget:
+                        st.markdown(f"""
+                        <div style='background:{color_bg};border:2px solid {color_border};
+                            border-radius:10px;padding:12px;margin-bottom:8px'>
+                            <h4 style='color:{color_border};margin:0;font-size:15px'>
+                                {emoji} {cat}s <span style='font-size:12px;font-weight:400'>({len(grupo)} clientes)</span>
+                            </h4>
+                        </div>""", unsafe_allow_html=True)
+                        if len(grupo) > 0:
+                            st.dataframe(grupo.style.format({
+                                f"Venta {mes_foda_label}": "${:,.0f}",
+                                "Var. vs mes ant. (%)": "{:+.1f}%"
+                            }), hide_index=True, use_container_width=True, height=220)
+                        else:
+                            st.info(f"Sin clientes en {cat}.")
+
+                tabla_cuadrante(col_q1, "Oportunidad", "#EAF7F7", "#3ABFC4", "🔵")
+                tabla_cuadrante(col_q2, "Fortaleza",   "#EAF3DE", "#6DB33F", "💪")
+                tabla_cuadrante(col_q3, "Debilidad",   "#FEFAE0", "#B8860B", "⚡")
+                tabla_cuadrante(col_q4, "Amenaza",     "#FEF0E7", "#E67E22", "⚠️")
 
                 # Tabla detalle por categoría
                 for cat in ["Fortaleza", "Oportunidad", "Amenaza", "Debilidad"]:
