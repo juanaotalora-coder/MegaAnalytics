@@ -629,7 +629,7 @@ if archivo:
 
         st.divider()
 
-        tab_foda, tab3, tab4, tab6 = st.tabs(["Matriz FODA", "Top clientes", "Análisis por cliente", "Tabla completa"])
+        tab_ytd, tab_foda, tab3, tab4, tab6 = st.tabs(["Tendencia YTD", "Matriz FODA", "Top clientes", "Análisis por cliente", "Tabla completa"])
 
         with tab3:
             # YTD: para año actual hasta mes anterior al actual,
@@ -794,6 +794,105 @@ if archivo:
                     )
             else:
                 st.info("No hay datos para este cliente con los meses seleccionados.")
+
+        with tab_ytd:
+            st.subheader("Tendencia YTD — Ventas vs Variación")
+
+            todos_pares_ytd = [(m, c, a) for a in anios for m, c in data_por_anio[a]]
+
+            # Separar por año
+            pares_26 = [(m, c) for m, c, a in todos_pares_ytd if a == max(anios)]
+            pares_25 = {m: c for m, c, a in todos_pares_ytd if a == min(anios)}
+
+            if not pares_26:
+                st.info("Se necesitan datos de al menos 2 años para esta vista.")
+            else:
+                meses_graf = []
+                ventas_26  = []
+                var_pct    = []
+                labels_x   = []
+
+                for m, c in pares_26:
+                    vta26 = df[c].sum()
+                    col25 = pares_25.get(m)
+                    vta25 = df[col25].sum() if col25 else 0
+                    var   = ((vta26 - vta25) / vta25 * 100) if vta25 > 0 else 0
+                    anio_label = max(anios)
+                    labels_x.append(f"{m} {anio_label}")
+                    ventas_26.append(vta26)
+                    var_pct.append(round(var, 1))
+
+                # KPIs
+                ytd_total_26 = sum(ventas_26[:mes_ytd])
+                ytd_total_25 = sum(
+                    df[pares_25[m]].sum() if m in pares_25 else 0
+                    for m, _ in pares_26[:mes_ytd]
+                )
+                var_ytd = ((ytd_total_26 - ytd_total_25) / ytd_total_25 * 100) if ytd_total_25 > 0 else 0
+
+                k1, k2 = st.columns(2)
+                color_var = "#27AE60" if var_ytd >= 0 else "#E74C3C"
+                k1.markdown(f"""
+                <div style='background:linear-gradient(135deg,#0D2E35,#1A5C6B);
+                    padding:16px;border-radius:10px;text-align:center;'>
+                    <p style='color:rgba(255,255,255,0.6);margin:0;font-size:12px;letter-spacing:2px;text-transform:uppercase'>Var % Vtas YTD</p>
+                    <p style='color:{color_var};margin:4px 0 0;font-size:28px;font-weight:800'>{var_ytd:+.1f}%</p>
+                </div>""", unsafe_allow_html=True)
+                k2.markdown(f"""
+                <div style='background:linear-gradient(135deg,#0D2E35,#1E7A3E);
+                    padding:16px;border-radius:10px;text-align:center;'>
+                    <p style='color:rgba(255,255,255,0.6);margin:0;font-size:12px;letter-spacing:2px;text-transform:uppercase'>Ventas YTD</p>
+                    <p style='color:#3ABFC4;margin:4px 0 0;font-size:28px;font-weight:800'>${ytd_total_26/1e6:.1f} Mill</p>
+                </div>""", unsafe_allow_html=True)
+
+                st.markdown("<br>", unsafe_allow_html=True)
+
+                # Gráfico combinado
+                fig_ytd = go.Figure()
+
+                # Barras variación
+                colores_barras = ["#3ABFC4" if v >= 0 else "#E74C3C" for v in var_pct]
+                fig_ytd.add_trace(go.Bar(
+                    x=labels_x, y=var_pct,
+                    name="Var % Vtas",
+                    marker_color=colores_barras,
+                    opacity=0.85,
+                    text=[f"{v:+.1f}%" for v in var_pct],
+                    textposition="inside",
+                    textfont=dict(color="white", size=11, family="Arial Bold"),
+                    yaxis="y1"
+                ))
+
+                # Línea ventas
+                fig_ytd.add_trace(go.Scatter(
+                    x=labels_x, y=ventas_26,
+                    name="Ventas",
+                    mode="lines+markers+text",
+                    line=dict(color="#1A5C6B", width=2.5),
+                    marker=dict(size=8, color="#1A5C6B",
+                                line=dict(width=2, color="white")),
+                    text=[f"{v/1e6:.1f} mill." for v in ventas_26],
+                    textposition="top center",
+                    textfont=dict(size=10, color="#1A5C6B"),
+                    yaxis="y2"
+                ))
+
+                fig_ytd.update_layout(
+                    title="Var % Vtas y Ventas por Mes",
+                    xaxis=dict(title="Mes", tickangle=-30),
+                    yaxis=dict(title="Var % Vtas", zeroline=True,
+                               zerolinecolor="#999", zerolinewidth=1.5,
+                               ticksuffix="%"),
+                    yaxis2=dict(title="Ventas ($)", overlaying="y", side="right",
+                                showgrid=False, tickprefix="$"),
+                    legend=dict(orientation="h", y=1.12),
+                    plot_bgcolor="#FAFAFA",
+                    paper_bgcolor="white",
+                    height=500,
+                    bargap=0.35,
+                    hovermode="x unified"
+                )
+                st.plotly_chart(fig_ytd, use_container_width=True)
 
         with tab_foda:
             st.subheader("Matriz FODA de Clientes")
