@@ -110,11 +110,11 @@ st.markdown("""
 MESES_ORDEN = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"]
 
 with st.sidebar:
-    st.header("Configuración")
-    col_cliente = st.text_input("Columna de cliente", value="Cliente")
-    col_ciudad  = st.text_input("Columna de ciudad",  value="Ciudad")
-    umbral      = st.number_input("Umbral mínimo para contar como venta ($)", value=10000, step=1000)
-    col_hoja    = st.text_input("Hoja del Excel (vacío = primera hoja)", value="")
+    with st.expander("⚙️ Configuración", expanded=False):
+        col_cliente = st.text_input("Columna de cliente", value="Cliente")
+        col_ciudad  = st.text_input("Columna de ciudad",  value="Ciudad")
+        umbral      = st.number_input("Umbral mínimo ($)", value=10000, step=1000)
+        col_hoja    = st.text_input("Hoja del Excel (vacío = primera hoja)", value="")
 
 # ── Modo de carga ────────────────────────────────────────────
 modo = st.radio("¿Cómo quieres cargar tu base de datos?",
@@ -667,6 +667,7 @@ if archivo:
             df_nuevos    = df_nuevos.rename(columns={mes_rec_col: f"Venta {mes_rec_label}"})
             df_retomados = df_retomados.rename(columns={mes_rec_col: f"Venta {mes_rec_label}"})
             df_2m        = df_2m.rename(columns={mes_ant_col: f"Venta {mes_ant_label}", mes_rec_col: f"Venta {mes_rec_label}"})
+            df_2m["Var. valor ($)"] = df_2m[f"Venta {mes_rec_label}"] - df_2m[f"Venta {mes_ant_label}"]
             df_fuga      = df_fuga.rename(columns={mes_ant_col: f"Última venta ({mes_ant_label})"})
 
             # Metas por categoría
@@ -685,24 +686,48 @@ if archivo:
             col_venta_2m_rec = f"Venta {mes_rec_label}"
             col_venta_f = f"Última venta ({mes_ant_label})"
 
-            def header_cuadrante(n, meta, color, emoji, titulo, caption):
+            def header_cuadrante(n, meta, color, emoji, titulo, caption, n_ant=None):
                 vs_meta = f" · Meta: {meta}" if meta > 0 else ""
                 cumple = "✅" if meta > 0 and n >= meta else ("❌" if meta > 0 else "")
+                ant_txt = f"<span style='color:#999;font-size:11px;margin-left:8px'>ant: {n_ant}</span>" if n_ant is not None else ""
                 return f"""<div style='background:{color}22;border:2px solid {color};
                     border-radius:10px;padding:10px 14px;margin-bottom:8px'>
                     <div style='display:flex;justify-content:space-between;align-items:center'>
                         <span style='color:{color};font-size:15px;font-weight:700'>{emoji} {titulo}</span>
-                        <span style='color:{color};font-size:20px;font-weight:800'>{n}{vs_meta} {cumple}</span>
+                        <span style='color:{color};font-size:20px;font-weight:800'>{n} {cumple}{ant_txt}</span>
                     </div>
-                    <p style='color:#666;font-size:12px;margin:4px 0 0'>{caption}</p>
+                    <p style='color:#666;font-size:12px;margin:4px 0 0'>{caption}{vs_meta}</p>
                 </div>"""
+
+            # Calcular conteos del mes anterior para referencia
+            if idx_ref >= 2:
+                mes_prev2_label, mes_prev2_col = todos_pares[idx_ref - 2]
+                compro_prev2 = df[mes_prev2_col] >= umbral
+                # Nuevos mes anterior: compraron en ant pero no en los 3 antes de ant
+                meses_3_ant_prev = todos_pares[max(0, idx_ref-4):idx_ref-1]
+                if meses_3_ant_prev:
+                    no_c3_prev = pd.Series([True]*len(df), index=df.index)
+                    for _, cc in meses_3_ant_prev:
+                        no_c3_prev = no_c3_prev & (df[cc] < umbral)
+                    mask_nuevos_ant = compro_ant & no_c3_prev
+                else:
+                    mask_nuevos_ant = compro_ant & ~compro_prev2
+                mask_retomados_ant = compro_ant & ~compro_prev2 & ~mask_nuevos_ant
+                mask_2m_ant = compro_ant & compro_prev2
+                mask_fuga_ant = compro_prev2 & ~compro_ant
+                n_ant_nuevos    = mask_nuevos_ant.sum()
+                n_ant_activos   = mask_2m_ant.sum()
+                n_ant_retomados = mask_retomados_ant.sum()
+                n_ant_fuga      = mask_fuga_ant.sum()
+            else:
+                n_ant_nuevos = n_ant_activos = n_ant_retomados = n_ant_fuga = None
 
             q1, q2 = st.columns(2)
             q3, q4 = st.columns(2)
 
             with q1:
                 st.markdown(header_cuadrante(len(df_nuevos), meta_nuevos, "#6DB33F", "🆕", "Clientes Nuevos",
-                    f"Compraron en {mes_rec_label} pero no en los 3 meses anteriores."), unsafe_allow_html=True)
+                    f"Compraron en {mes_rec_label} pero no en los 3 meses anteriores.", n_ant=n_ant_nuevos), unsafe_allow_html=True)
                 if len(df_nuevos) > 0:
                     st.dataframe(df_nuevos.style.format({col_venta_n: "${:,.0f}"}),
                                  hide_index=True, use_container_width=True, height=220)
@@ -711,18 +736,19 @@ if archivo:
 
             with q2:
                 st.markdown(header_cuadrante(len(df_2m), meta_activos, "#3ABFC4", "⭐", "Activos 2 Meses",
-                    f"Compraron tanto en {mes_ant_label} como en {mes_rec_label}."), unsafe_allow_html=True)
+                    f"Compraron tanto en {mes_ant_label} como en {mes_rec_label}.", n_ant=n_ant_activos), unsafe_allow_html=True)
                 if len(df_2m) > 0:
                     st.dataframe(df_2m.style.format({
                         col_venta_2m_ant: "${:,.0f}",
-                        col_venta_2m_rec: "${:,.0f}"
+                        col_venta_2m_rec: "${:,.0f}",
+                        "Var. valor ($)": "${:+,.0f}"
                     }), hide_index=True, use_container_width=True, height=220)
                 else:
                     st.info("Sin clientes activos 2 meses.")
 
             with q3:
                 st.markdown(header_cuadrante(len(df_retomados), meta_retomados, "#8E44AD", "🔄", "Clientes Retomados",
-                    f"No compraron en {mes_ant_label} pero sí en {mes_rec_label}."), unsafe_allow_html=True)
+                    f"No compraron en {mes_ant_label} pero sí en {mes_rec_label}.", n_ant=n_ant_retomados), unsafe_allow_html=True)
                 if len(df_retomados) > 0:
                     st.dataframe(df_retomados.style.format({col_venta_r: "${:,.0f}"}),
                                  hide_index=True, use_container_width=True, height=220)
@@ -731,7 +757,7 @@ if archivo:
 
             with q4:
                 st.markdown(header_cuadrante(len(df_fuga), meta_fuga, "#E67E22", "⚠️", "Clientes en Fuga",
-                    f"Compraron en {mes_ant_label} pero no en {mes_rec_label}."), unsafe_allow_html=True)
+                    f"Compraron en {mes_ant_label} pero no en {mes_rec_label}.", n_ant=n_ant_fuga), unsafe_allow_html=True)
                 if len(df_fuga) > 0:
                     st.dataframe(df_fuga.style.format({col_venta_f: "${:,.0f}"}),
                                  hide_index=True, use_container_width=True, height=220)
