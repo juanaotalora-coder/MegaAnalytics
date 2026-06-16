@@ -339,7 +339,7 @@ if archivo:
             with st.expander(f"⚠️ Se detectaron {n_alertas} posibles problemas de nombres", expanded=True):
 
                 if grupos_duplicados:
-                    st.markdown("**Duplicados exactos** — Selecciona cuáles filas eliminar")
+                    st.markdown("**Duplicados exactos**")
                     for cn, idxs in grupos_duplicados.items():
                         st.markdown(f"**`{clientes_lista[idxs[0]]}`** — {len(idxs)} filas detectadas:")
                         cols_mostrar = [col_cliente] + ([col_ciudad] if col_ciudad in df_reset.columns else []) + cols_orden[:6]
@@ -347,9 +347,15 @@ if archivo:
                         st.dataframe(filas_grupo.style.format(
                             {c: "${:,.0f}" for c in cols_orden[:6] if c in filas_grupo.columns}
                         ), use_container_width=True, hide_index=False)
-                        for pos, idx in enumerate(idxs[1:], 1):
-                            if st.checkbox(f"Eliminar fila {idx} (fila {pos+1})", key=f"dup_{cn}_{idx}"):
-                                indices_a_eliminar.add(idx)
+                        col_a, col_b = st.columns(2)
+                        with col_a:
+                            if st.checkbox("Fusionar todas en una (sumar ventas)", key=f"fus_dup_{cn}"):
+                                fusiones_a_aplicar.append((idxs[:1], idxs[1:]))
+                        with col_b:
+                            st.markdown("**O elimina filas específicas:**")
+                            for pos, idx in enumerate(idxs[1:], 1):
+                                if st.checkbox(f"Eliminar fila {pos+1}", key=f"dup_{cn}_{idx}"):
+                                    indices_a_eliminar.add(idx)
                         st.markdown("---")
 
                 if pares_similares:
