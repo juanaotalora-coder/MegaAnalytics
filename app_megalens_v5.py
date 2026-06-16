@@ -113,8 +113,10 @@ with st.sidebar:
     with st.expander("⚙️ Configuración", expanded=False):
         col_cliente = st.text_input("Columna de cliente", value="Cliente")
         col_ciudad  = st.text_input("Columna de ciudad",  value="Ciudad")
-        umbral      = st.number_input("Umbral mínimo ($)", value=10000, step=1000)
         col_hoja    = st.text_input("Hoja del Excel (vacío = primera hoja)", value="")
+
+# Valor por defecto del umbral (se sobreescribe en revisión de datos)
+umbral = 10000
 
 # ── Modo de carga ────────────────────────────────────────────
 modo = st.radio("¿Cómo quieres cargar tu base de datos?",
