@@ -410,6 +410,107 @@ if archivo:
         metr = {a: calcular(data_filtrada[a], meses_3m.get(a, [])) for a in anios}
 
         # ── Tabla resumen ────────────────────────────────────────────
+        # ── Gráfico Tendencia YTD ────────────────────────────────
+        st.subheader("Tendencia YTD — Ventas vs Variación")
+
+        todos_pares_ytd = [(m, c, a) for a in anios for m, c in data_por_anio[a]]
+
+        # Separar por año
+        pares_26 = [(m, c) for m, c, a in todos_pares_ytd if a == max(anios)]
+        pares_25 = {m: c for m, c, a in todos_pares_ytd if a == min(anios)}
+
+        if not pares_26:
+            st.info("Se necesitan datos de al menos 2 años para esta vista.")
+        else:
+            meses_graf = []
+            ventas_26  = []
+            var_pct    = []
+            labels_x   = []
+
+            for m, c in pares_26:
+                vta26 = df[c].sum()
+                col25 = pares_25.get(m)
+                vta25 = df[col25].sum() if col25 else 0
+                var   = ((vta26 - vta25) / vta25 * 100) if vta25 > 0 else 0
+                anio_label = max(anios)
+                labels_x.append(f"{m} {anio_label}")
+                ventas_26.append(vta26)
+                var_pct.append(round(var, 1))
+
+            # KPIs
+            ytd_total_26 = sum(ventas_26[:mes_ytd])
+            ytd_total_25 = sum(
+                df[pares_25[m]].sum() if m in pares_25 else 0
+                for m, _ in pares_26[:mes_ytd]
+            )
+            var_ytd = ((ytd_total_26 - ytd_total_25) / ytd_total_25 * 100) if ytd_total_25 > 0 else 0
+
+            k1, k2 = st.columns(2)
+            color_var = "#27AE60" if var_ytd >= 0 else "#E74C3C"
+            k1.markdown(f"""
+            <div style='background:linear-gradient(135deg,#0D2E35,#1A5C6B);
+                padding:16px;border-radius:10px;text-align:center;'>
+                <p style='color:rgba(255,255,255,0.6);margin:0;font-size:12px;letter-spacing:2px;text-transform:uppercase'>Var % Vtas YTD</p>
+                <p style='color:{color_var};margin:4px 0 0;font-size:28px;font-weight:800'>{var_ytd:+.1f}%</p>
+            </div>""", unsafe_allow_html=True)
+            k2.markdown(f"""
+            <div style='background:linear-gradient(135deg,#0D2E35,#1E7A3E);
+                padding:16px;border-radius:10px;text-align:center;'>
+                <p style='color:rgba(255,255,255,0.6);margin:0;font-size:12px;letter-spacing:2px;text-transform:uppercase'>Ventas YTD</p>
+                <p style='color:#3ABFC4;margin:4px 0 0;font-size:28px;font-weight:800'>${ytd_total_26/1e6:.1f} Mill</p>
+            </div>""", unsafe_allow_html=True)
+
+            st.markdown("<br>", unsafe_allow_html=True)
+
+            # Gráfico combinado
+            fig_ytd = go.Figure()
+
+            # Barras variación
+            colores_barras = ["#3ABFC4" if v >= 0 else "#E74C3C" for v in var_pct]
+            fig_ytd.add_trace(go.Bar(
+                x=labels_x, y=var_pct,
+                name="Var % Vtas",
+                marker_color=colores_barras,
+                opacity=0.85,
+                text=[f"{v:+.1f}%" for v in var_pct],
+                textposition="inside",
+                textfont=dict(color="white", size=11, family="Arial Bold"),
+                yaxis="y1"
+            ))
+
+            # Línea ventas
+            fig_ytd.add_trace(go.Scatter(
+                x=labels_x, y=ventas_26,
+                name="Ventas",
+                mode="lines+markers+text",
+                line=dict(color="#1A5C6B", width=2.5),
+                marker=dict(size=8, color="#1A5C6B",
+                            line=dict(width=2, color="white")),
+                text=[f"{v/1e6:.1f} mill." for v in ventas_26],
+                textposition="top center",
+                textfont=dict(size=10, color="#1A5C6B"),
+                yaxis="y2"
+            ))
+
+            fig_ytd.update_layout(
+                title="Var % Vtas y Ventas por Mes",
+                xaxis=dict(title="Mes", tickangle=-30),
+                yaxis=dict(title="Var % Vtas", zeroline=True,
+                           zerolinecolor="#999", zerolinewidth=1.5,
+                           ticksuffix="%"),
+                yaxis2=dict(title="Ventas ($)", overlaying="y", side="right",
+                            showgrid=False, tickprefix="$"),
+                legend=dict(orientation="h", y=1.12),
+                plot_bgcolor="#FAFAFA",
+                paper_bgcolor="white",
+                height=500,
+                bargap=0.35,
+                hovermode="x unified"
+            )
+            st.plotly_chart(fig_ytd, use_container_width=True)
+
+        st.divider()
+
         st.subheader("Resumen de clientes activos")
         COLORES = ["#2E86C1", "#1E8449", "#6C3483", "#A93226"]
 
@@ -568,51 +669,74 @@ if archivo:
             df_2m        = df_2m.rename(columns={mes_ant_col: f"Venta {mes_ant_label}", mes_rec_col: f"Venta {mes_rec_label}"})
             df_fuga      = df_fuga.rename(columns={mes_ant_col: f"Última venta ({mes_ant_label})"})
 
-            # Mostrar en tabs dentro de la sección
-            subtab_n, subtab_r, subtab_2m, subtab_f = st.tabs([
-                f"🆕 Nuevos ({len(df_nuevos)})",
-                f"🔄 Retomados ({len(df_retomados)})",
-                f"⭐ Activos 2 meses ({len(df_2m)})",
-                f"⚠️ En fuga ({len(df_fuga)})"
-            ])
+            # Metas por categoría
+            st.markdown("**Metas por categoría** (opcional)")
+            mc1, mc2, mc3, mc4 = st.columns(4)
+            with mc1: meta_nuevos   = st.number_input("Meta Nuevos",    min_value=0, value=0, step=1, key="meta_n")
+            with mc2: meta_activos  = st.number_input("Meta Activos 2m",min_value=0, value=0, step=1, key="meta_a")
+            with mc3: meta_retomados= st.number_input("Meta Retomados", min_value=0, value=0, step=1, key="meta_r")
+            with mc4: meta_fuga     = st.number_input("Meta Fuga",      min_value=0, value=0, step=1, key="meta_f")
+
+            st.markdown("<br>", unsafe_allow_html=True)
 
             col_venta_n = f"Venta {mes_rec_label}"
             col_venta_r = f"Venta {mes_rec_label}"
+            col_venta_2m_ant = f"Venta {mes_ant_label}"
+            col_venta_2m_rec = f"Venta {mes_rec_label}"
             col_venta_f = f"Última venta ({mes_ant_label})"
 
-            with subtab_n:
-                st.caption(f"Compraron en {mes_rec_label} pero no en los 3 meses anteriores.")
+            def header_cuadrante(n, meta, color, emoji, titulo, caption):
+                vs_meta = f" · Meta: {meta}" if meta > 0 else ""
+                cumple = "✅" if meta > 0 and n >= meta else ("❌" if meta > 0 else "")
+                return f"""<div style='background:{color}22;border:2px solid {color};
+                    border-radius:10px;padding:10px 14px;margin-bottom:8px'>
+                    <div style='display:flex;justify-content:space-between;align-items:center'>
+                        <span style='color:{color};font-size:15px;font-weight:700'>{emoji} {titulo}</span>
+                        <span style='color:{color};font-size:20px;font-weight:800'>{n}{vs_meta} {cumple}</span>
+                    </div>
+                    <p style='color:#666;font-size:12px;margin:4px 0 0'>{caption}</p>
+                </div>"""
+
+            q1, q2 = st.columns(2)
+            q3, q4 = st.columns(2)
+
+            with q1:
+                st.markdown(header_cuadrante(len(df_nuevos), meta_nuevos, "#6DB33F", "🆕", "Clientes Nuevos",
+                    f"Compraron en {mes_rec_label} pero no en los 3 meses anteriores."), unsafe_allow_html=True)
                 if len(df_nuevos) > 0:
                     st.dataframe(df_nuevos.style.format({col_venta_n: "${:,.0f}"}),
-                                 hide_index=True, use_container_width=True)
+                                 hide_index=True, use_container_width=True, height=220)
                 else:
-                    st.info("No hay clientes nuevos en este período.")
+                    st.info("Sin clientes nuevos.")
 
-            with subtab_r:
-                st.caption(f"No compraron en {mes_ant_label} pero sí en {mes_rec_label}.")
-                if len(df_retomados) > 0:
-                    st.dataframe(df_retomados.style.format({col_venta_r: "${:,.0f}"}),
-                                 hide_index=True, use_container_width=True)
-                else:
-                    st.info("No hay clientes retomados en este período.")
-
-            with subtab_2m:
-                st.caption(f"Compraron tanto en {mes_ant_label} como en {mes_rec_label}.")
+            with q2:
+                st.markdown(header_cuadrante(len(df_2m), meta_activos, "#3ABFC4", "⭐", "Activos 2 Meses",
+                    f"Compraron tanto en {mes_ant_label} como en {mes_rec_label}."), unsafe_allow_html=True)
                 if len(df_2m) > 0:
                     st.dataframe(df_2m.style.format({
-                        f"Venta {mes_ant_label}": "${:,.0f}",
-                        f"Venta {mes_rec_label}": "${:,.0f}"
-                    }), hide_index=True, use_container_width=True)
+                        col_venta_2m_ant: "${:,.0f}",
+                        col_venta_2m_rec: "${:,.0f}"
+                    }), hide_index=True, use_container_width=True, height=220)
                 else:
-                    st.info("No hay clientes activos 2 meses consecutivos.")
+                    st.info("Sin clientes activos 2 meses.")
 
-            with subtab_f:
-                st.caption(f"Compraron en {mes_ant_label} pero no en {mes_rec_label}.")
+            with q3:
+                st.markdown(header_cuadrante(len(df_retomados), meta_retomados, "#8E44AD", "🔄", "Clientes Retomados",
+                    f"No compraron en {mes_ant_label} pero sí en {mes_rec_label}."), unsafe_allow_html=True)
+                if len(df_retomados) > 0:
+                    st.dataframe(df_retomados.style.format({col_venta_r: "${:,.0f}"}),
+                                 hide_index=True, use_container_width=True, height=220)
+                else:
+                    st.info("Sin clientes retomados.")
+
+            with q4:
+                st.markdown(header_cuadrante(len(df_fuga), meta_fuga, "#E67E22", "⚠️", "Clientes en Fuga",
+                    f"Compraron en {mes_ant_label} pero no en {mes_rec_label}."), unsafe_allow_html=True)
                 if len(df_fuga) > 0:
                     st.dataframe(df_fuga.style.format({col_venta_f: "${:,.0f}"}),
-                                 hide_index=True, use_container_width=True)
+                                 hide_index=True, use_container_width=True, height=220)
                 else:
-                    st.info("No hay clientes en fuga en este período.")
+                    st.info("Sin clientes en fuga.")
 
         else:
             st.info("Se necesitan al menos 2 meses de datos para calcular estas métricas.")
@@ -660,7 +784,7 @@ if archivo:
 
         st.divider()
 
-        tab_ytd, tab_foda, tab3, tab4, tab6 = st.tabs(["Tendencia YTD", "Matriz FODA", "Top clientes", "Análisis por cliente", "Tabla completa"])
+        tab3, tab4, tab6 = st.tabs(["Top clientes", "Análisis por cliente", "Tabla completa"])
 
         with tab3:
             # YTD: para año actual hasta mes anterior al actual,
@@ -826,107 +950,8 @@ if archivo:
             else:
                 st.info("No hay datos para este cliente con los meses seleccionados.")
 
-        with tab_ytd:
-            st.subheader("Tendencia YTD — Ventas vs Variación")
 
-            todos_pares_ytd = [(m, c, a) for a in anios for m, c in data_por_anio[a]]
-
-            # Separar por año
-            pares_26 = [(m, c) for m, c, a in todos_pares_ytd if a == max(anios)]
-            pares_25 = {m: c for m, c, a in todos_pares_ytd if a == min(anios)}
-
-            if not pares_26:
-                st.info("Se necesitan datos de al menos 2 años para esta vista.")
-            else:
-                meses_graf = []
-                ventas_26  = []
-                var_pct    = []
-                labels_x   = []
-
-                for m, c in pares_26:
-                    vta26 = df[c].sum()
-                    col25 = pares_25.get(m)
-                    vta25 = df[col25].sum() if col25 else 0
-                    var   = ((vta26 - vta25) / vta25 * 100) if vta25 > 0 else 0
-                    anio_label = max(anios)
-                    labels_x.append(f"{m} {anio_label}")
-                    ventas_26.append(vta26)
-                    var_pct.append(round(var, 1))
-
-                # KPIs
-                ytd_total_26 = sum(ventas_26[:mes_ytd])
-                ytd_total_25 = sum(
-                    df[pares_25[m]].sum() if m in pares_25 else 0
-                    for m, _ in pares_26[:mes_ytd]
-                )
-                var_ytd = ((ytd_total_26 - ytd_total_25) / ytd_total_25 * 100) if ytd_total_25 > 0 else 0
-
-                k1, k2 = st.columns(2)
-                color_var = "#27AE60" if var_ytd >= 0 else "#E74C3C"
-                k1.markdown(f"""
-                <div style='background:linear-gradient(135deg,#0D2E35,#1A5C6B);
-                    padding:16px;border-radius:10px;text-align:center;'>
-                    <p style='color:rgba(255,255,255,0.6);margin:0;font-size:12px;letter-spacing:2px;text-transform:uppercase'>Var % Vtas YTD</p>
-                    <p style='color:{color_var};margin:4px 0 0;font-size:28px;font-weight:800'>{var_ytd:+.1f}%</p>
-                </div>""", unsafe_allow_html=True)
-                k2.markdown(f"""
-                <div style='background:linear-gradient(135deg,#0D2E35,#1E7A3E);
-                    padding:16px;border-radius:10px;text-align:center;'>
-                    <p style='color:rgba(255,255,255,0.6);margin:0;font-size:12px;letter-spacing:2px;text-transform:uppercase'>Ventas YTD</p>
-                    <p style='color:#3ABFC4;margin:4px 0 0;font-size:28px;font-weight:800'>${ytd_total_26/1e6:.1f} Mill</p>
-                </div>""", unsafe_allow_html=True)
-
-                st.markdown("<br>", unsafe_allow_html=True)
-
-                # Gráfico combinado
-                fig_ytd = go.Figure()
-
-                # Barras variación
-                colores_barras = ["#3ABFC4" if v >= 0 else "#E74C3C" for v in var_pct]
-                fig_ytd.add_trace(go.Bar(
-                    x=labels_x, y=var_pct,
-                    name="Var % Vtas",
-                    marker_color=colores_barras,
-                    opacity=0.85,
-                    text=[f"{v:+.1f}%" for v in var_pct],
-                    textposition="inside",
-                    textfont=dict(color="white", size=11, family="Arial Bold"),
-                    yaxis="y1"
-                ))
-
-                # Línea ventas
-                fig_ytd.add_trace(go.Scatter(
-                    x=labels_x, y=ventas_26,
-                    name="Ventas",
-                    mode="lines+markers+text",
-                    line=dict(color="#1A5C6B", width=2.5),
-                    marker=dict(size=8, color="#1A5C6B",
-                                line=dict(width=2, color="white")),
-                    text=[f"{v/1e6:.1f} mill." for v in ventas_26],
-                    textposition="top center",
-                    textfont=dict(size=10, color="#1A5C6B"),
-                    yaxis="y2"
-                ))
-
-                fig_ytd.update_layout(
-                    title="Var % Vtas y Ventas por Mes",
-                    xaxis=dict(title="Mes", tickangle=-30),
-                    yaxis=dict(title="Var % Vtas", zeroline=True,
-                               zerolinecolor="#999", zerolinewidth=1.5,
-                               ticksuffix="%"),
-                    yaxis2=dict(title="Ventas ($)", overlaying="y", side="right",
-                                showgrid=False, tickprefix="$"),
-                    legend=dict(orientation="h", y=1.12),
-                    plot_bgcolor="#FAFAFA",
-                    paper_bgcolor="white",
-                    height=500,
-                    bargap=0.35,
-                    hovermode="x unified"
-                )
-                st.plotly_chart(fig_ytd, use_container_width=True)
-
-        with tab_foda:
-            st.subheader("Matriz FODA de Clientes")
+            pass  # contenido manejado arriba en sección de clientes
             st.caption("Eje X: posición vs promedio de la ciudad | Eje Y: variación vs período anterior")
 
             # Calcular métricas para FODA usando selector de pestañas
