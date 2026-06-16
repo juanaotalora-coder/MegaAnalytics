@@ -135,10 +135,16 @@ def leer_excel(archivo, sheet=0):
         return pd.read_excel(archivo, sheet_name=sheet)
 
 def preparar_base(df_raw, anio, col_cli="Cliente"):
+    df_raw = df_raw.copy()
     df_raw.columns = df_raw.columns.str.strip()
-    # Detectar columnas de meses (sin año) como Ene, Feb, Mar...
+    # Verificar que col_cli existe
+    if col_cli not in df_raw.columns:
+        raise KeyError(f"La columna '{col_cli}' no existe en el archivo. Columnas disponibles: {list(df_raw.columns)}")
+    # Detectar columnas de meses (sin año)
     cols_meses = [c for c in df_raw.columns if c.capitalize() in MESES_ORDEN]
-    cols_info  = [c for c in df_raw.columns if c in COLS_BASE]
+    # Columnas de info opcionales (Ciudad, Zona, Mensajero) solo si existen
+    cols_info_opcionales = ["Ciudad", "Zona", "Mensajero"]
+    cols_info = [col_cli] + [c for c in cols_info_opcionales if c in df_raw.columns]
     df_out = df_raw[cols_info + cols_meses].copy()
     # Renombrar meses a formato Mes-AA
     sufijo = str(anio)[-2:]
@@ -146,6 +152,7 @@ def preparar_base(df_raw, anio, col_cli="Cliente"):
     df_out = df_out.rename(columns=rename_map)
     df_out[col_cli] = df_out[col_cli].fillna("").astype(str).str.strip()
     df_out = df_out[df_out[col_cli] != ""]
+    df_out = df_out[~df_out[col_cli].str.lower().isin(["nan", "none", "total", "totales"])]
     # Limpiar numéricos
     for c in [rename_map[m] for m in cols_meses]:
         df_out[c] = pd.to_numeric(
