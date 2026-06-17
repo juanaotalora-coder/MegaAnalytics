@@ -802,13 +802,7 @@ if archivo:
             df_2m["Var. valor ($)"] = df_2m[f"Venta {mes_rec_label}"] - df_2m[f"Venta {mes_ant_label}"]
             df_fuga      = df_fuga.rename(columns={mes_ant_col: f"Última venta ({mes_ant_label})"})
 
-            # Metas por categoría
-            st.markdown("**Metas por categoría** (opcional)")
-            mc1, mc2, mc3, mc4 = st.columns(4)
-            with mc1: meta_nuevos   = st.number_input("Meta Nuevos",    min_value=0, value=0, step=1, key="meta_n")
-            with mc2: meta_activos  = st.number_input("Meta Activos 2m",min_value=0, value=0, step=1, key="meta_a")
-            with mc3: meta_retomados= st.number_input("Meta Retomados", min_value=0, value=0, step=1, key="meta_r")
-            with mc4: meta_fuga     = st.number_input("Meta Fuga",      min_value=0, value=0, step=1, key="meta_f")
+            meta_nuevos = meta_activos = meta_retomados = meta_fuga = 0
 
             st.markdown("<br>", unsafe_allow_html=True)
 
