@@ -795,15 +795,16 @@ if archivo:
             col_venta_2m_rec = f"Venta {mes_rec_label}"
             col_venta_f = f"Última venta ({mes_ant_label})"
 
-            def header_cuadrante(n, meta, color, emoji, titulo, caption, n_ant=None):
+            def header_cuadrante(n, meta, color, emoji, titulo, caption, n_ant=None, total_vtas=None):
                 vs_meta = f" · Meta: {meta}" if meta > 0 else ""
                 cumple = "✅" if meta > 0 and n >= meta else ("❌" if meta > 0 else "")
                 ant_txt = f"<span style='color:#999;font-size:11px;margin-left:8px'>ant: {n_ant}</span>" if n_ant is not None else ""
+                vtas_txt = f"<span style='color:{color};font-size:11px;font-weight:500;margin-left:4px'>${total_vtas/1e6:.1f}M</span>" if total_vtas is not None else ""
                 return f"""<div style='background:{color}22;border:2px solid {color};
                     border-radius:10px;padding:10px 14px;margin-bottom:8px'>
                     <div style='display:flex;justify-content:space-between;align-items:center'>
                         <span style='color:{color};font-size:15px;font-weight:700'>{emoji} {titulo}</span>
-                        <span style='color:{color};font-size:20px;font-weight:800'>{n} {cumple}{ant_txt}</span>
+                        <span style='color:{color};font-size:20px;font-weight:800'>{n} {cumple}{ant_txt}{vtas_txt}</span>
                     </div>
                     <p style='color:#666;font-size:12px;margin:4px 0 0'>{caption}{vs_meta}</p>
                 </div>"""
@@ -834,9 +835,15 @@ if archivo:
             q1, q2 = st.columns(2)
             q3, q4 = st.columns(2)
 
+            vtas_nuevos    = df_nuevos[f"Venta {mes_rec_label}"].sum() if len(df_nuevos) > 0 else 0
+            vtas_retomados = df_retomados[f"Venta {mes_rec_label}"].sum() if len(df_retomados) > 0 else 0
+            vtas_2m        = df_2m[f"Venta {mes_rec_label}"].sum() if len(df_2m) > 0 else 0
+            vtas_fuga      = df_fuga[f"Última venta ({mes_ant_label})"].sum() if len(df_fuga) > 0 else 0
+
             with q1:
                 st.markdown(header_cuadrante(len(df_nuevos), meta_nuevos, "#6DB33F", "🆕", "Clientes Nuevos",
-                    f"Compraron en {mes_rec_label} pero no en los 3 meses anteriores.", n_ant=n_ant_nuevos), unsafe_allow_html=True)
+                    f"Compraron en {mes_rec_label} pero no en los 3 meses anteriores.",
+                    n_ant=n_ant_nuevos, total_vtas=vtas_nuevos), unsafe_allow_html=True)
                 if len(df_nuevos) > 0:
                     st.dataframe(df_nuevos.style.format({col_venta_n: "${:,.0f}"}),
                                  hide_index=True, use_container_width=True, height=220)
@@ -845,7 +852,8 @@ if archivo:
 
             with q2:
                 st.markdown(header_cuadrante(len(df_2m), meta_activos, "#3ABFC4", "⭐", "Activos 2 Meses",
-                    f"Compraron tanto en {mes_ant_label} como en {mes_rec_label}.", n_ant=n_ant_activos), unsafe_allow_html=True)
+                    f"Compraron tanto en {mes_ant_label} como en {mes_rec_label}.",
+                    n_ant=n_ant_activos, total_vtas=vtas_2m), unsafe_allow_html=True)
                 if len(df_2m) > 0:
                     st.dataframe(df_2m.style.format({
                         col_venta_2m_ant: "${:,.0f}",
@@ -857,7 +865,8 @@ if archivo:
 
             with q3:
                 st.markdown(header_cuadrante(len(df_retomados), meta_retomados, "#8E44AD", "🔄", "Clientes Retomados",
-                    f"No compraron en {mes_ant_label} pero sí en {mes_rec_label}.", n_ant=n_ant_retomados), unsafe_allow_html=True)
+                    f"No compraron en {mes_ant_label} pero sí en {mes_rec_label}.",
+                    n_ant=n_ant_retomados, total_vtas=vtas_retomados), unsafe_allow_html=True)
                 if len(df_retomados) > 0:
                     st.dataframe(df_retomados.style.format({col_venta_r: "${:,.0f}"}),
                                  hide_index=True, use_container_width=True, height=220)
@@ -866,7 +875,8 @@ if archivo:
 
             with q4:
                 st.markdown(header_cuadrante(len(df_fuga), meta_fuga, "#E67E22", "⚠️", "Clientes en Fuga",
-                    f"Compraron en {mes_ant_label} pero no en {mes_rec_label}.", n_ant=n_ant_fuga), unsafe_allow_html=True)
+                    f"Compraron en {mes_ant_label} pero no en {mes_rec_label}.",
+                    n_ant=n_ant_fuga, total_vtas=vtas_fuga), unsafe_allow_html=True)
                 if len(df_fuga) > 0:
                     st.dataframe(df_fuga.style.format({col_venta_f: "${:,.0f}"}),
                                  hide_index=True, use_container_width=True, height=220)
