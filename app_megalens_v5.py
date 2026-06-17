@@ -785,7 +785,9 @@ if archivo:
             def ultimo_mes_compra(row):
                 for m_label, m_col in reversed(todos_pares_ant):
                     if row[m_col] >= umbral:
-                        return m_label
+                        # Obtener año de la columna (formato Mes-AA)
+                        anio_suf = m_col.split("-")[-1] if "-" in m_col else ""
+                        return f"{m_label}-{anio_suf}" if anio_suf else m_label
                 return "—"
             if len(df_ret_base) > 0:
                 df_ret_base["Último mes compra"] = df_ret_base.apply(ultimo_mes_compra, axis=1)
