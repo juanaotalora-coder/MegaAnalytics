@@ -738,39 +738,60 @@ if archivo:
             meses_3_ant = todos_pares[max(0, idx_ref-3):idx_ref]
             st.caption(f"Comparando {mes_ant_label} → {mes_rec_label}")
 
-            compro_reciente   = df[mes_rec_col] >= umbral
-            compro_ant        = df[mes_ant_col] >= umbral
+            compro_reciente = df[mes_rec_col] >= umbral
+            compro_ant      = df[mes_ant_col] >= umbral
 
-            # Clientes nuevos: compraron en mes reciente pero no en ninguno de los 3 anteriores
-            if len(meses_3_ant) > 0:
-                no_compro_3ant = pd.Series([True] * len(df), index=df.index)
-                for _, c in meses_3_ant:
-                    no_compro_3ant = no_compro_3ant & (df[c] < umbral)
-                mask_nuevos = compro_reciente & no_compro_3ant
+            # Todos los pares anteriores al mes actual
+            todos_pares_ant = todos_pares[:idx_ref]
+            cols_todos_ant  = [c for _, c in todos_pares_ant]
+
+            # Nunca compraron en ningún mes anterior disponible
+            if cols_todos_ant:
+                nunca_compro = pd.Series([True] * len(df), index=df.index)
+                for c in cols_todos_ant:
+                    nunca_compro = nunca_compro & (df[c] < umbral)
             else:
-                mask_nuevos = compro_reciente & ~compro_ant
+                nunca_compro = pd.Series([True] * len(df), index=df.index)
 
-            # Clientes retomados: no compraron el mes anterior pero sí en el más reciente
-            mask_retomados = compro_reciente & ~compro_ant & ~mask_nuevos
+            # Alguna vez compraron en algún mes anterior
+            alguna_vez = ~nunca_compro
 
-            # Clientes activos 2 meses consecutivos recientes
+            # Máscaras mutuamente excluyentes
+            # Nuevos: compraron ahora y NUNCA antes en toda la base
+            mask_nuevos = compro_reciente & nunca_compro
+
+            # Activos 2 meses: compraron ahora Y el mes anterior
             if idx_ref >= 1:
-                mes_ant2_label, mes_ant2_col = todos_pares[idx_ref - 1]
-                compro_ant2 = df[mes_ant2_col] >= umbral
-                mask_2m = compro_reciente & compro_ant2
+                compro_ant2 = df[todos_pares[idx_ref - 1][1]] >= umbral
+                mask_2m = compro_reciente & compro_ant
             else:
                 mask_2m = pd.Series([False] * len(df), index=df.index)
 
-            # Clientes en fuga
+            # Retomados: compraron ahora, NO el mes anterior, SÍ alguna vez antes
+            mask_retomados = compro_reciente & ~compro_ant & alguna_vez & ~mask_nuevos
+
+            # En fuga: compraron el mes anterior pero NO ahora
             mask_fuga = compro_ant & ~compro_reciente
 
-            # Construir dataframes con valores numéricos para ordenamiento correcto
+            # Encontrar último mes de compra para retomados
             cols_base_df = [col_cliente] + ([col_ciudad] if col_ciudad in df.columns else [])
 
             df_nuevos    = df[mask_nuevos][cols_base_df + [mes_rec_col]].copy()
-            df_retomados = df[mask_retomados][cols_base_df + [mes_rec_col]].copy()
             df_2m        = df[mask_2m][cols_base_df + [mes_ant_col, mes_rec_col]].copy()
             df_fuga      = df[mask_fuga][cols_base_df + [mes_ant_col]].copy()
+
+            # Para retomados: agregar último mes en que compraron
+            df_ret_base = df[mask_retomados][cols_base_df + [mes_rec_col] + cols_todos_ant].copy()
+            def ultimo_mes_compra(row):
+                for m_label, m_col in reversed(todos_pares_ant):
+                    if row[m_col] >= umbral:
+                        return m_label
+                return "—"
+            if len(df_ret_base) > 0:
+                df_ret_base["Último mes compra"] = df_ret_base.apply(ultimo_mes_compra, axis=1)
+            else:
+                df_ret_base["Último mes compra"] = []
+            df_retomados = df_ret_base[cols_base_df + ["Último mes compra", mes_rec_col]].copy()
 
             # Renombrar columnas
             df_nuevos    = df_nuevos.rename(columns={mes_rec_col: f"Venta {mes_rec_label}"})
