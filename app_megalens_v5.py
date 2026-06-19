@@ -648,7 +648,13 @@ if archivo:
     
                 h = st.columns(n_cols)
                 with h[0]:
-                    st.markdown(f"<div style='background:{color};color:white;text-align:center;padding:6px 2px;border-radius:4px;font-size:12px;font-weight:600'>Clientes Activos<br>YTD {anio}</div>", unsafe_allow_html=True)
+                    st.markdown(f"""<div style='background:{color};color:white;text-align:center;padding:6px 2px;border-radius:4px;font-size:12px;font-weight:600'>
+                        Clientes Activos<br>YTD {anio}
+                        <span style='display:inline-block;background:rgba(255,255,255,0.25);border-radius:10px;
+                            padding:1px 8px;font-size:10px;font-weight:700;margin-top:3px'>
+                            {n_3m} · {pct_3m:.0f}% fidelización
+                        </span>
+                    </div>""", unsafe_allow_html=True)
                 for j, m in enumerate(meses):
                     with h[j+1]:
                         st.markdown(f"<div style='background:{color};color:white;text-align:center;padding:6px 2px;font-size:13px;font-weight:600'>{m}</div>", unsafe_allow_html=True)
@@ -663,17 +669,50 @@ if archivo:
                         st.markdown(f"<div style='text-align:center;font-size:20px;font-weight:700;color:#3D3D3D;padding:6px 0'>{activos[m]}</div>", unsafe_allow_html=True)
                 with v[-1]:
                     st.markdown(f"<div style='text-align:center;font-size:20px;font-weight:700;color:#3D3D3D;padding:6px 0'>{n_3m}</div>", unsafe_allow_html=True)
-    
-                st.markdown(f"""
-                <div style='background:linear-gradient(90deg,#3ABFC4,#6DB33F);color:white;
-                            text-align:center;padding:10px;border-radius:6px;
-                            font-weight:600;font-size:14px;margin-top:6px'>
-                    Porcentaje de Fidelización: {pct_3m:.0f}%
-                </div>
-                </div>
-                """, unsafe_allow_html=True)
-                with st.popover("ℹ️ ¿Qué es el Porcentaje de Fidelización?"):
-                    st.markdown("Proporción de clientes que compraron en los **3 meses seleccionados**, en relación con el promedio mensual de clientes activos del período.")
+                st.markdown("</div>", unsafe_allow_html=True)
+
+                # ── Lista de clientes recurrentes con sus 3 meses ──────────
+                meses_rec_anio = meses_3m.get(anio, [])
+                if len(meses_rec_anio) == 3:
+                    pares_rec_anio = [(m, c) for m, c in data_filtrada[anio] if m in meses_rec_anio]
+                    mask_rec = pd.Series([True] * len(df), index=df.index)
+                    for _, c in pares_rec_anio:
+                        mask_rec = mask_rec & (df[c] >= umbral)
+                    df_rec_anio = df[mask_rec][[col_cliente]].copy()
+                    for m, c in pares_rec_anio:
+                        df_rec_anio[m] = df[mask_rec][c].values
+
+                    # Si es el año más reciente, marcar quiénes también fueron recurrentes el año anterior
+                    es_resaltable = False
+                    clientes_rec_anio_anterior = set()
+                    if i > 0:
+                        anio_prev = anios[i-1]
+                        meses_rec_prev = meses_3m.get(anio_prev, [])
+                        if len(meses_rec_prev) == 3:
+                            pares_rec_prev = [(m, c) for m, c in data_filtrada[anio_prev] if m in meses_rec_prev]
+                            mask_rec_prev = pd.Series([True] * len(df), index=df.index)
+                            for _, c in pares_rec_prev:
+                                mask_rec_prev = mask_rec_prev & (df[c] >= umbral)
+                            clientes_rec_anio_anterior = set(df[mask_rec_prev][col_cliente].tolist())
+                            es_resaltable = True
+
+                    with st.expander(f"Ver {len(df_rec_anio)} clientes recurrentes de {anio}"):
+                        if es_resaltable:
+                            st.caption(f"🟢 Resaltados: también fueron recurrentes en {anios[i-1]}")
+                        if len(df_rec_anio) > 0:
+                            def resaltar_fila(row):
+                                if es_resaltable and row[col_cliente] in clientes_rec_anio_anterior:
+                                    return ['background-color: #EAF3DE'] * len(row)
+                                return [''] * len(row)
+                            st.dataframe(
+                                df_rec_anio.style.apply(resaltar_fila, axis=1).format(
+                                    {m: "${:,.0f}" for m in meses_rec_anio}
+                                ),
+                                hide_index=True, use_container_width=True
+                            )
+                        else:
+                            st.info("No hay clientes recurrentes en este período.")
+
                 st.markdown("<div style='margin-bottom:8px'></div>", unsafe_allow_html=True)
     
             # Variación YoY promedio compras + Últ. 3M
