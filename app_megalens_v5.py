@@ -189,9 +189,18 @@ if modo == "Bases separadas por año (2025 + 2026)":
             meses_25 = [c for c in df25.columns if patron_mes.match(str(c))]
             meses_26 = [c for c in df26.columns if patron_mes.match(str(c))]
 
+            # Clave de merge: Cliente + Ciudad si Ciudad está disponible en ambas bases
+            tiene_ciudad = "Ciudad" in df25.columns and "Ciudad" in df26.columns
+            if tiene_ciudad:
+                df25["Ciudad"] = df25["Ciudad"].fillna("").astype(str).str.strip()
+                df26["Ciudad"] = df26["Ciudad"].fillna("").astype(str).str.strip()
+                claves_merge = [col_cliente, "Ciudad"]
+            else:
+                claves_merge = [col_cliente]
+
             df_merged = pd.merge(
-                df25, df26[[col_cliente] + meses_26],
-                on=col_cliente, how="outer"
+                df25, df26[claves_merge + meses_26],
+                on=claves_merge, how="outer"
             )
             # Rellenar NaN en meses
             for c in meses_25 + meses_26:
