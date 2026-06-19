@@ -622,7 +622,6 @@ if archivo:
                     bargap=0.35,
                     hovermode="x unified"
                 )
-                st.session_state["fig_ytd_export"] = fig_ytd
                 st.plotly_chart(fig_ytd, use_container_width=True)
     
             st.divider()
@@ -649,12 +648,12 @@ if archivo:
     
                 h = st.columns(n_cols)
                 with h[0]:
-                    st.markdown(f"""<div style='background:{color};color:white;text-align:center;padding:6px 2px;border-radius:4px;font-size:12px;font-weight:600'>
-                        Clientes Activos<br>YTD {anio}
-                        <span style='display:inline-block;background:rgba(255,255,255,0.25);border-radius:10px;
-                            padding:1px 8px;font-size:10px;font-weight:700;margin-top:3px'>
-                            {n_3m} · {pct_3m:.0f}% fidelización
-                        </span>
+                    st.markdown(f"""<div style='background:{color};color:white;text-align:center;padding:8px 4px;border-radius:4px'>
+                        <div style='font-size:12px;font-weight:600;line-height:1.3'>Clientes Activos<br>YTD {anio}</div>
+                        <div style='display:inline-block;background:rgba(255,255,255,0.25);border-radius:10px;
+                            padding:2px 8px;font-size:10px;font-weight:700;margin-top:6px;white-space:nowrap'>
+                            {n_3m} · {pct_3m:.0f}%
+                        </div>
                     </div>""", unsafe_allow_html=True)
                 for j, m in enumerate(meses):
                     with h[j+1]:
@@ -701,6 +700,15 @@ if archivo:
                         if es_resaltable:
                             st.caption(f"🟢 Resaltados: también fueron recurrentes en {anios[i-1]}")
                         if len(df_rec_anio) > 0:
+                            ultimo_mes_rec = meses_rec_anio[-1]
+                            if es_resaltable:
+                                df_rec_anio["_es_resaltado"] = df_rec_anio[col_cliente].isin(clientes_rec_anio_anterior)
+                                df_rec_anio = df_rec_anio.sort_values(
+                                    ["_es_resaltado", ultimo_mes_rec], ascending=[False, False]
+                                ).drop(columns=["_es_resaltado"])
+                            else:
+                                df_rec_anio = df_rec_anio.sort_values(ultimo_mes_rec, ascending=False)
+
                             def resaltar_fila(row):
                                 if es_resaltable and row[col_cliente] in clientes_rec_anio_anterior:
                                     return ['background-color: #EAF3DE'] * len(row)
@@ -1311,127 +1319,6 @@ if archivo:
                 st.download_button("Descargar en Excel", data=buffer.getvalue(),
                                    file_name="resultados_megalens.xlsx",
                                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-
-        # ── Exportar informe en PDF ────────────────────────────────────
-        st.divider()
-        st.subheader("📄 Exportar informe en PDF")
-        st.caption("Selecciona qué secciones incluir en el PDF.")
-
-        secciones_disp = {
-            "Tendencia YTD": "ytd",
-            "Resumen de Activos": "resumen",
-            "Tipo de Cliente": "tipo_cliente",
-            "Top clientes": "top",
-        }
-        cols_check = st.columns(len(secciones_disp))
-        secciones_sel = []
-        for i, (label, key) in enumerate(secciones_disp.items()):
-            with cols_check[i]:
-                if st.checkbox(label, value=True, key=f"pdf_{key}"):
-                    secciones_sel.append((label, key))
-
-        if st.button("Generar PDF"):
-            with st.spinner("Generando PDF..."):
-                from reportlab.lib.pagesizes import letter
-                from reportlab.lib.units import cm
-                from reportlab.platypus import (SimpleDocTemplate, Table, TableStyle,
-                                                  Paragraph, Spacer, Image as RLImage)
-                from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-                from reportlab.lib import colors as rl_colors
-
-                pdf_buffer = io.BytesIO()
-                doc = SimpleDocTemplate(pdf_buffer, pagesize=letter,
-                                        topMargin=1.5*cm, bottomMargin=1.5*cm)
-                styles = getSampleStyleSheet()
-                title_style = ParagraphStyle("TitleMega", parent=styles["Heading1"],
-                                             textColor=rl_colors.HexColor("#1A5C6B"))
-                h2_style = ParagraphStyle("H2Mega", parent=styles["Heading2"],
-                                          textColor=rl_colors.HexColor("#3ABFC4"))
-
-                elementos = []
-                elementos.append(Paragraph("Megalens — Análisis de Clientes y Ventas", title_style))
-                elementos.append(Paragraph(f"Período: {periodo_label}", styles["Normal"]))
-                elementos.append(Spacer(1, 12))
-
-                def tabla_a_reportlab(df_tabla, max_filas=25):
-                    df_show = df_tabla.head(max_filas)
-                    data = [list(df_show.columns)] + df_show.astype(str).values.tolist()
-                    t = Table(data, repeatRows=1)
-                    t.setStyle(TableStyle([
-                        ('BACKGROUND', (0,0), (-1,0), rl_colors.HexColor("#1A5C6B")),
-                        ('TEXTCOLOR', (0,0), (-1,0), rl_colors.white),
-                        ('FONTSIZE', (0,0), (-1,-1), 7),
-                        ('GRID', (0,0), (-1,-1), 0.5, rl_colors.grey),
-                        ('ROWBACKGROUNDS', (0,1), (-1,-1), [rl_colors.white, rl_colors.HexColor("#EAF7F7")]),
-                    ]))
-                    return t
-
-                if "ytd" in [k for _, k in secciones_sel]:
-                    elementos.append(Paragraph("Tendencia YTD", h2_style))
-                    fig_para_pdf = st.session_state.get("fig_ytd_export")
-                    if fig_para_pdf is not None:
-                        try:
-                            img_bytes = fig_para_pdf.to_image(format="png", width=900, height=450, scale=2)
-                            elementos.append(RLImage(io.BytesIO(img_bytes), width=16*cm, height=8*cm))
-                        except Exception as e_img:
-                            elementos.append(Paragraph(f"(No se pudo generar la imagen: {e_img})", styles["Normal"]))
-                    else:
-                        elementos.append(Paragraph("(Visita la pestaña Tendencia YTD antes de exportar para incluir la gráfica)", styles["Normal"]))
-                    elementos.append(Spacer(1, 16))
-
-                if "resumen" in [k for _, k in secciones_sel]:
-                    elementos.append(Paragraph("Resumen de Clientes Activos", h2_style))
-                    for anio in anios:
-                        activos, ventas, n_3m, pct_3m, prom_compras = metr[anio]
-                        if activos:
-                            data_resumen = [["Año", "3 meses recurrentes", "% Fidelización"],
-                                           [str(anio), str(n_3m), f"{pct_3m:.0f}%"]]
-                            t = Table(data_resumen)
-                            t.setStyle(TableStyle([
-                                ('BACKGROUND', (0,0), (-1,0), rl_colors.HexColor("#3ABFC4")),
-                                ('TEXTCOLOR', (0,0), (-1,0), rl_colors.white),
-                                ('GRID', (0,0), (-1,-1), 0.5, rl_colors.grey),
-                                ('FONTSIZE', (0,0), (-1,-1), 9),
-                            ]))
-                            elementos.append(t)
-                            elementos.append(Spacer(1, 8))
-                    elementos.append(Spacer(1, 12))
-
-                if "tipo_cliente" in [k for _, k in secciones_sel]:
-                    elementos.append(Paragraph("Tipo de Cliente", h2_style))
-                    resumen_tipo = [["Categoría", "# Clientes"],
-                                    ["Nuevos", str(len(df_nuevos))],
-                                    ["Retomados", str(len(df_retomados))],
-                                    ["Activos 2 meses", str(len(df_2m))],
-                                    ["En fuga", str(len(df_fuga))],
-                                    ["Inactivos", str(n_inactivos)]]
-                    t = Table(resumen_tipo)
-                    t.setStyle(TableStyle([
-                        ('BACKGROUND', (0,0), (-1,0), rl_colors.HexColor("#6DB33F")),
-                        ('TEXTCOLOR', (0,0), (-1,0), rl_colors.white),
-                        ('GRID', (0,0), (-1,-1), 0.5, rl_colors.grey),
-                        ('FONTSIZE', (0,0), (-1,-1), 9),
-                    ]))
-                    elementos.append(t)
-                    elementos.append(Spacer(1, 16))
-
-                if "top" in [k for _, k in secciones_sel]:
-                    elementos.append(Paragraph(f"Top clientes — {periodo_label}", h2_style))
-                    top_pdf = df.sort_values("_venta_periodo", ascending=False).head(15)[[col_cliente, "_venta_periodo"]].copy()
-                    top_pdf["_venta_periodo"] = top_pdf["_venta_periodo"].apply(lambda x: f"${x:,.0f}")
-                    top_pdf.columns = [col_cliente, "Ventas"]
-                    elementos.append(tabla_a_reportlab(top_pdf))
-                    elementos.append(Spacer(1, 16))
-
-                doc.build(elementos)
-                pdf_buffer.seek(0)
-
-                st.download_button(
-                    "⬇️ Descargar PDF",
-                    data=pdf_buffer.getvalue(),
-                    file_name=f"informe_megalens_{periodo_label.replace(' ','_')}.pdf",
-                    mime="application/pdf"
-                )
 
     except Exception as e:
         st.error(f"Error: {e}")
