@@ -622,6 +622,7 @@ if archivo:
                     bargap=0.35,
                     hovermode="x unified"
                 )
+                st.session_state["fig_ytd_export"] = fig_ytd
                 st.plotly_chart(fig_ytd, use_container_width=True)
     
             st.divider()
@@ -1321,7 +1322,6 @@ if archivo:
             "Resumen de Activos": "resumen",
             "Tipo de Cliente": "tipo_cliente",
             "Top clientes": "top",
-            "Matriz FODA": "foda",
         }
         cols_check = st.columns(len(secciones_disp))
         secciones_sel = []
@@ -1366,13 +1366,17 @@ if archivo:
                     ]))
                     return t
 
-                if "ytd" in [k for _, k in secciones_sel] and 'fig_ytd' in dir():
+                if "ytd" in [k for _, k in secciones_sel]:
                     elementos.append(Paragraph("Tendencia YTD", h2_style))
-                    try:
-                        img_bytes = fig_ytd.to_image(format="png", width=900, height=450, scale=2)
-                        elementos.append(RLImage(io.BytesIO(img_bytes), width=16*cm, height=8*cm))
-                    except Exception:
-                        elementos.append(Paragraph("(Gráfica no disponible)", styles["Normal"]))
+                    fig_para_pdf = st.session_state.get("fig_ytd_export")
+                    if fig_para_pdf is not None:
+                        try:
+                            img_bytes = fig_para_pdf.to_image(format="png", width=900, height=450, scale=2)
+                            elementos.append(RLImage(io.BytesIO(img_bytes), width=16*cm, height=8*cm))
+                        except Exception as e_img:
+                            elementos.append(Paragraph(f"(No se pudo generar la imagen: {e_img})", styles["Normal"]))
+                    else:
+                        elementos.append(Paragraph("(Visita la pestaña Tendencia YTD antes de exportar para incluir la gráfica)", styles["Normal"]))
                     elementos.append(Spacer(1, 16))
 
                 if "resumen" in [k for _, k in secciones_sel]:
@@ -1418,12 +1422,6 @@ if archivo:
                     top_pdf.columns = [col_cliente, "Ventas"]
                     elementos.append(tabla_a_reportlab(top_pdf))
                     elementos.append(Spacer(1, 16))
-
-                if "foda" in [k for _, k in secciones_sel] and 'df_foda' in dir():
-                    elementos.append(Paragraph("Matriz FODA — Resumen", h2_style))
-                    resumen_foda = df_foda["categoria"].value_counts().reset_index()
-                    resumen_foda.columns = ["Categoría", "# Clientes"]
-                    elementos.append(tabla_a_reportlab(resumen_foda))
 
                 doc.build(elementos)
                 pdf_buffer.seek(0)
