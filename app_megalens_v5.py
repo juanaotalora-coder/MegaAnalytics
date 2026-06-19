@@ -1310,7 +1310,131 @@ if archivo:
                 st.download_button("Descargar en Excel", data=buffer.getvalue(),
                                    file_name="resultados_megalens.xlsx",
                                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-    
+
+        # ── Exportar informe en PDF ────────────────────────────────────
+        st.divider()
+        st.subheader("📄 Exportar informe en PDF")
+        st.caption("Selecciona qué secciones incluir en el PDF.")
+
+        secciones_disp = {
+            "Tendencia YTD": "ytd",
+            "Resumen de Activos": "resumen",
+            "Tipo de Cliente": "tipo_cliente",
+            "Top clientes": "top",
+            "Matriz FODA": "foda",
+        }
+        cols_check = st.columns(len(secciones_disp))
+        secciones_sel = []
+        for i, (label, key) in enumerate(secciones_disp.items()):
+            with cols_check[i]:
+                if st.checkbox(label, value=True, key=f"pdf_{key}"):
+                    secciones_sel.append((label, key))
+
+        if st.button("Generar PDF"):
+            with st.spinner("Generando PDF..."):
+                from reportlab.lib.pagesizes import letter
+                from reportlab.lib.units import cm
+                from reportlab.platypus import (SimpleDocTemplate, Table, TableStyle,
+                                                  Paragraph, Spacer, Image as RLImage)
+                from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+                from reportlab.lib import colors as rl_colors
+
+                pdf_buffer = io.BytesIO()
+                doc = SimpleDocTemplate(pdf_buffer, pagesize=letter,
+                                        topMargin=1.5*cm, bottomMargin=1.5*cm)
+                styles = getSampleStyleSheet()
+                title_style = ParagraphStyle("TitleMega", parent=styles["Heading1"],
+                                             textColor=rl_colors.HexColor("#1A5C6B"))
+                h2_style = ParagraphStyle("H2Mega", parent=styles["Heading2"],
+                                          textColor=rl_colors.HexColor("#3ABFC4"))
+
+                elementos = []
+                elementos.append(Paragraph("Megalens — Análisis de Clientes y Ventas", title_style))
+                elementos.append(Paragraph(f"Período: {periodo_label}", styles["Normal"]))
+                elementos.append(Spacer(1, 12))
+
+                def tabla_a_reportlab(df_tabla, max_filas=25):
+                    df_show = df_tabla.head(max_filas)
+                    data = [list(df_show.columns)] + df_show.astype(str).values.tolist()
+                    t = Table(data, repeatRows=1)
+                    t.setStyle(TableStyle([
+                        ('BACKGROUND', (0,0), (-1,0), rl_colors.HexColor("#1A5C6B")),
+                        ('TEXTCOLOR', (0,0), (-1,0), rl_colors.white),
+                        ('FONTSIZE', (0,0), (-1,-1), 7),
+                        ('GRID', (0,0), (-1,-1), 0.5, rl_colors.grey),
+                        ('ROWBACKGROUNDS', (0,1), (-1,-1), [rl_colors.white, rl_colors.HexColor("#EAF7F7")]),
+                    ]))
+                    return t
+
+                if "ytd" in [k for _, k in secciones_sel] and 'fig_ytd' in dir():
+                    elementos.append(Paragraph("Tendencia YTD", h2_style))
+                    try:
+                        img_bytes = fig_ytd.to_image(format="png", width=900, height=450, scale=2)
+                        elementos.append(RLImage(io.BytesIO(img_bytes), width=16*cm, height=8*cm))
+                    except Exception:
+                        elementos.append(Paragraph("(Gráfica no disponible)", styles["Normal"]))
+                    elementos.append(Spacer(1, 16))
+
+                if "resumen" in [k for _, k in secciones_sel]:
+                    elementos.append(Paragraph("Resumen de Clientes Activos", h2_style))
+                    for anio in anios:
+                        activos, ventas, n_3m, pct_3m, prom_compras = metr[anio]
+                        if activos:
+                            data_resumen = [["Año", "3 meses recurrentes", "% Fidelización"],
+                                           [str(anio), str(n_3m), f"{pct_3m:.0f}%"]]
+                            t = Table(data_resumen)
+                            t.setStyle(TableStyle([
+                                ('BACKGROUND', (0,0), (-1,0), rl_colors.HexColor("#3ABFC4")),
+                                ('TEXTCOLOR', (0,0), (-1,0), rl_colors.white),
+                                ('GRID', (0,0), (-1,-1), 0.5, rl_colors.grey),
+                                ('FONTSIZE', (0,0), (-1,-1), 9),
+                            ]))
+                            elementos.append(t)
+                            elementos.append(Spacer(1, 8))
+                    elementos.append(Spacer(1, 12))
+
+                if "tipo_cliente" in [k for _, k in secciones_sel]:
+                    elementos.append(Paragraph("Tipo de Cliente", h2_style))
+                    resumen_tipo = [["Categoría", "# Clientes"],
+                                    ["Nuevos", str(len(df_nuevos))],
+                                    ["Retomados", str(len(df_retomados))],
+                                    ["Activos 2 meses", str(len(df_2m))],
+                                    ["En fuga", str(len(df_fuga))],
+                                    ["Inactivos", str(n_inactivos)]]
+                    t = Table(resumen_tipo)
+                    t.setStyle(TableStyle([
+                        ('BACKGROUND', (0,0), (-1,0), rl_colors.HexColor("#6DB33F")),
+                        ('TEXTCOLOR', (0,0), (-1,0), rl_colors.white),
+                        ('GRID', (0,0), (-1,-1), 0.5, rl_colors.grey),
+                        ('FONTSIZE', (0,0), (-1,-1), 9),
+                    ]))
+                    elementos.append(t)
+                    elementos.append(Spacer(1, 16))
+
+                if "top" in [k for _, k in secciones_sel]:
+                    elementos.append(Paragraph(f"Top clientes — {periodo_label}", h2_style))
+                    top_pdf = df.sort_values("_venta_periodo", ascending=False).head(15)[[col_cliente, "_venta_periodo"]].copy()
+                    top_pdf["_venta_periodo"] = top_pdf["_venta_periodo"].apply(lambda x: f"${x:,.0f}")
+                    top_pdf.columns = [col_cliente, "Ventas"]
+                    elementos.append(tabla_a_reportlab(top_pdf))
+                    elementos.append(Spacer(1, 16))
+
+                if "foda" in [k for _, k in secciones_sel] and 'df_foda' in dir():
+                    elementos.append(Paragraph("Matriz FODA — Resumen", h2_style))
+                    resumen_foda = df_foda["categoria"].value_counts().reset_index()
+                    resumen_foda.columns = ["Categoría", "# Clientes"]
+                    elementos.append(tabla_a_reportlab(resumen_foda))
+
+                doc.build(elementos)
+                pdf_buffer.seek(0)
+
+                st.download_button(
+                    "⬇️ Descargar PDF",
+                    data=pdf_buffer.getvalue(),
+                    file_name=f"informe_megalens_{periodo_label.replace(' ','_')}.pdf",
+                    mime="application/pdf"
+                )
+
     except Exception as e:
         st.error(f"Error: {e}")
         st.exception(e)
