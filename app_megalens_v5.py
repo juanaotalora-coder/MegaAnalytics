@@ -843,7 +843,7 @@ if archivo:
                 mask_fuga = compro_ant & ~compro_reciente
     
                 # Encontrar último mes de compra para retomados
-                cols_base_df = [col_cliente] + ([col_ciudad] if col_ciudad in df.columns else []) + (["Zona"] if "Zona" in df.columns else [])
+                cols_base_df = [col_cliente] + (["Zona"] if "Zona" in df.columns else []) + (["Mensajero"] if "Mensajero" in df.columns else [])
     
                 df_nuevos    = df[mask_nuevos][cols_base_df + [mes_rec_col]].copy()
                 df_2m        = df[mask_2m][cols_base_df + [mes_ant_col, mes_rec_col]].copy()
